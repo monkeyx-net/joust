@@ -68,7 +68,8 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   CPU address map), `images.c` (the image catalogue: ROM addresses and
   sizes, decoded through the blitter and the ROM's palette), `zip.c`,
   `inflate.c`, `png.c` (RGB and RGBA), `assets.c` (asset folder lookup)
-- `sim/` - (to come) pure C game simulation, no SDL, no drawing
+- `sim/` - pure C game simulation, no SDL, no drawing: `prng.c` (the ROM's
+  random number generator at $E4C0, and the IRQ's stir)
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
 - `web/` - page shell for the Emscripten build
@@ -101,6 +102,9 @@ Every change keeps `ctest` green.
   `build/re`; never commit it). `capture_probe.lua` also takes `PROBE_CYCLE`
   (repeating input) and `PROBE_POKE` / `PROBE_POKE_FROM` (e.g. `A051=05
   A052=05` for unlimited lives once a game runs).
+- `mame_prng` - label `mame`: every stir and step of the random state from
+  power-on, replayed through `sim/prng.c`
+- More RE probes: `access_probe.lua` (which code reads and writes given addresses)
 - MAME tests share `build/mame` (one at a time) and start each run from a
   fresh copy of the primed CMOS (`src/tests/mame/mame_common.cmake`); MAME
   needs `-frameskip 0` for snapshots to show the frame they are taken in

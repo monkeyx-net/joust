@@ -86,6 +86,21 @@ game's RAM map.
 - `src/tests/mame/dasm_probe.lua` writes MAME's disassembly to `build/re`
   for reading the code (never commit its output).
 
+### Game code (P2 findings)
+
+- Direct page $A0 (RAM $A000-$A0FF) holds the game's globals. Jump table at
+  $E009-$E03A (e.g. $E018 random, $E037 wait some frames: `LDA #n; JSR $E037`).
+- Random numbers: a 16-bit shift register at $A00D:$A00E. `$E4C0` steps it:
+  A = ((lo >> 3) ^ lo) >> 1, the bit shifted out goes into hi's top bit and
+  hi's low bit into lo's top bit (ROR $0D; ROR $0E); callers use A and the
+  carry (lo's old bit 0). The IRQ handler stirs it 4 times a frame
+  (INC $0D; DEC $0E at $E395). The only caller of the step found so far is
+  $E54F. `sim/prng.c`; `mame_prng` replays ~20000 transitions from power-on.
+- `src/tests/mame/access_probe.lua` logs who reads and writes chosen
+  addresses (program counter and count): how the PRNG's users were found.
+- Next: the task scheduler behind $E037 and the object structures the
+  display list is built from; then flap, gravity and collisions.
+
 ## 3. Test plan
 
 - **Unit** (`ctest`, no ROM): scalers, presets, blitter, glow (`enhance`);
@@ -108,7 +123,7 @@ game's RAM map.
 |---|---|---|
 | P0 | Repo, ROM set loader (CRC matching, zip or folder), MAME pipeline, platform layer, test card, packaging, CI (done 2026-10-20) | `enhance`, `rom_load`, `mame_rom_map` pass |
 | P1 | (done 2026-10-20 bar later-wave-only images: video and palette decoding, blitter emulation, 166 named images checked against MAME) Graphics from the ROM: find the image tables (ostriches, buzzards, knights, pterodactyl, eggs, platforms, lava, troll hand, font) and the palette; extractor writes `assets/` at first run | Extracted frames drawn by the port match MAME screenshots of the same scenes |
-| P2 | Reverse engineering: RAM map, object lists, PRNG, flap and gravity physics, collisions and joust outcome, wave tables and spawn rules | Lua probes dump each documented variable; notes in this plan |
+| P2 | (started 2026-10-20: PRNG ported and checked) Reverse engineering: RAM map, object lists, PRNG, flap and gravity physics, collisions and joust outcome, wave tables and spawn rules | Lua probes dump each documented variable; notes in this plan |
 | P3 | Sim, wave 1: player, Bounders, eggs and hatching, platforms, scoring, death and respawn, deterministic from scripted input | Per-frame traces equal MAME's for scripted wave-1 games |
 | P4 | Full game: all wave types (egg, survival, gladiator, pterodactyl), Hunters and Shadow Lords, troll hand, lava, crumbling platforms, extra lives, 2 players | Traces match MAME through wave 10 |
 | P5 | Presentation: attract mode, high-score table and entry, operator menu (CMOS settings), sound (6808 + DAC emulation of the sound ROM, or player-side capture) | Device checklist on 3 handhelds + Steam Deck |
