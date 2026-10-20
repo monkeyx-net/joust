@@ -32,12 +32,30 @@ static char sounds_dir[1024]; /* holds sounds/, or "" */
 static Voice voices[CHANNELS];
 static Uint32 play_counter;
 
-static void mix(void *ud, Uint8 *stream, int len)
+/* The stream: a ring of mono samples at the device rate. */
+#define STREAM_SIZE 16384
+#define STREAM_MAX_LATENCY 4800 /* drop the oldest beyond 100 ms at 48 kHz */
+#define STREAM_PRIME 1600       /* start (and restart after running dry) at ~2 frames queued */
+static Sint16 stream[STREAM_SIZE];
+static int stream_read, stream_count;
+static double stream_phase; /* resampler position between input samples */
+static Sint16 stream_last;
+static int stream_primed;
+
+static void mix(void *ud, Uint8 *stream_bytes, int len)
 {
     (void)ud;
-    Sint16 *out = (Sint16 *)stream;
+    Sint16 *out = (Sint16 *)stream_bytes;
     int frames = len / 4;
-    memset(stream, 0, (size_t)len);
+    memset(stream_bytes, 0, (size_t)len);
+    if (!stream_primed && stream_count >= STREAM_PRIME) stream_primed = 1;
+    if (stream_primed && stream_count < frames) stream_primed = 0; /* ran dry: refill first */
+    for (int i = 0; stream_primed && i < frames; i++) {
+        Sint16 v = stream[stream_read];
+        stream_read = (stream_read + 1) % STREAM_SIZE;
+        stream_count--;
+        out[i * 2] = out[i * 2 + 1] = v;
+    }
     for (int c = 0; c < CHANNELS; c++) {
         Voice *v = &voices[c];
         if (!v->active) continue;
@@ -120,6 +138,30 @@ static void fade_out(Voice *v)
 {
     v->fading = 1;
     v->fade_step = v->gain / (have.freq * CROSSFADE_MS / 1000.0f);
+}
+
+void audio_stream(const int16_t *samples, int n, int rate)
+{
+    if (!dev || n <= 0) return;
+    double step = (double)rate / have.freq; /* input samples per output sample */
+    SDL_LockAudioDevice(dev);
+    for (;;) {
+        int i = (int)stream_phase;
+        if (i >= n) break;
+        double t = stream_phase - i;
+        Sint16 a = i ? samples[i - 1] : stream_last, b = samples[i];
+        Sint16 v = (Sint16)(a + (b - a) * t);
+        if (stream_count == STREAM_SIZE || stream_count >= STREAM_MAX_LATENCY) { /* drop the oldest */
+            stream_read = (stream_read + 1) % STREAM_SIZE;
+            stream_count--;
+        }
+        stream[(stream_read + stream_count) % STREAM_SIZE] = v;
+        stream_count++;
+        stream_phase += step;
+    }
+    stream_phase -= n;
+    stream_last = samples[n - 1];
+    SDL_UnlockAudioDevice(dev);
 }
 
 void audio_play(int id)

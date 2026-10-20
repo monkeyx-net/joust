@@ -23,8 +23,7 @@ static uint8_t pia1_read_a(void *ctx) { return ((Board *)ctx)->in2; }
 static void pia1_write_b(void *ctx, uint8_t pins)
 {
     Board *b = ctx;
-    b->sound_cmd = pins | 0xC0; /* the top two bits are pulled up on the board */
-    b->sound_cmd_new = 1;
+    sound_command(&b->sound, pins | 0xC0); /* the top two bits are pulled up on the board */
 }
 
 /* ---- memory map ------------------------------------------------------------ */
@@ -118,7 +117,8 @@ void board_init(Board *b, const RomSet *rom, const uint8_t *cmos)
     b->pia[0].c2b_changed = pia0_cb2;
     b->pia[1].read_a = pia1_read_a;
     b->pia[1].write_b = pia1_write_b;
-    b->sound_cmd = 0xFF;
+    /* one frame of emulated sound fills one tick of the port's audio */
+    sound_init(&b->sound, rom, SOUND_CPU_HZ / BOARD_FRAME_HZ / (BOARD_AUDIO_RATE / BOARD_AUDIO_FPS));
     b->cpu.ctx = b;
     b->cpu.read = bus_read;
     b->cpu.write = bus_write;
@@ -145,6 +145,7 @@ static void draw_line(const Board *b, Framebuffer *fb, int line)
    line, 246: the frame's picture is complete when it returns. */
 void board_run_frame(Board *b, Framebuffer *fb)
 {
+    b->sound.out_len = 0;
     for (int i = 0; i < BOARD_LINES; i++) {
         int line = (BOARD_FIRST_LINE + i) % BOARD_LINES;
         b->scanline = line;
@@ -158,6 +159,7 @@ void board_run_frame(Board *b, Framebuffer *fb)
             if (b->step_hook) b->step_hook(b);
             m6809_step(&b->cpu);
         }
+        sound_run(&b->sound, (long)((double)end * SOUND_CPU_HZ / 1e6));
         if (fb && fb->scale == 1) draw_line(b, fb, line);
     }
     b->frame++;

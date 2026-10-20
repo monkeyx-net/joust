@@ -8,11 +8,16 @@
 #ifndef JOUST_AUDIO_H
 #define JOUST_AUDIO_H
 
+#include <stdint.h>
+
 /* Open the device. Returns 1 if sound output is available. */
 int audio_init(const char *argv0);
 /* Load assets/sounds/<file>; returns a sound id, or -1. */
 int audio_load(const char *file, int priority, float volume);
 void audio_play(int id);
+/* Queue mono samples made at `rate` (the emulated sound board's output); they
+   play on top of the voices, resampled to the device's rate. */
+void audio_stream(const int16_t *samples, int n, int rate);
 /* Stop every voice playing this sound at once. */
 void audio_stop(int id);
 void audio_stop_all(void);

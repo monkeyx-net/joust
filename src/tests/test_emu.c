@@ -132,7 +132,8 @@ int main(int argc, char **argv)
             if (d) failed = 1;
         }
     }
-    printf("random state: %ld of MAME's %ld changes matched%s\n", bad ? got_n : got_n, want_n,
-           bad ? " before a mismatch" : "");
+    printf("random state: %ld of MAME's %ld changes matched%s\n", got_n, want_n, bad ? " before a mismatch" : "");
+    fb_free(&fb);
+    free(want);
     return bad || failed || got_n < want_n ? 1 : 0;
 }

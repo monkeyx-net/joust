@@ -1,16 +1,22 @@
 /*
  * Joust native build: SDL setup and the fixed 60 Hz loop. See JOUST_PORT_PLAN.md.
- * So far: the ROM set loader and a test card (ROM status, a two-player input
- * tester, the graphics presets) with pages of the images decoded from the
- * ROM (Select+R1 / F2 steps the pages); the game itself is still to come.
+ * The game is the ROM's own code on the emulated board (emu/board.c), one
+ * board frame per tick; the port supplies video (with the enhanced presets),
+ * input and saving the arcade's CMOS. --test-card shows the test card instead
+ * (ROM status, a two-player input tester, the graphics presets, and pages of
+ * the images decoded from the ROM: Select+R1 / F2 steps the pages).
  *
- *   joust [--windowed] [--gfx preset] [--rom path] [--page N] [--frames N] [--screenshot out.png]
+ *   joust [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N]
+ *         [--input script.txt] [--frames N] [--screenshot out.png]
  *   joust --check-rom <dir|zip>
  *   joust --dump-rom <dir|zip> <first> <last>
  *   joust --list-images
  *
  * --frames N stops after N updates; with --screenshot the last frame is
  * written as a PNG (use SDL_VIDEODRIVER=dummy to run headless).
+ * --input replays scripted controls: lines of "<frame> [coin] [start] [start2]
+ * [left] [right] [flap] [left2] [right2] [flap2] [menu]", each holding from
+ * that frame until the next line (live controls still quit).
  * --dump-rom prints "ADDR BYTE" lines (hex) for main-CPU addresses first..last,
  * the format the MAME probe writes (src/tests/mame/rom_map_probe.lua).
  * --list-images prints the image catalogue as "ADDR:W:H name" (hex address,
@@ -24,6 +30,8 @@
 #include "assets/images.h"
 #include "assets/png.h"
 #include "assets/rom.h"
+#include "assets/savefile.h"
+#include "emu/board.h"
 #include "gfx/blit.h"
 #include "gfx/debugfont.h"
 #include "gfx/enhance.h"
@@ -40,6 +48,9 @@
 /* Cap catch-up after a stall (suspend/resume, SD card hiccup). */
 #define MAX_STEPS_PER_PRESENT 4
 #define GFX_NOTICE_FRAMES 120
+#define CMOS_FILE "joust.cmos"
+#define CMOS_SAVE_FRAMES 300  /* write changed CMOS (scores, settings) at most every 5 s */
+#define PRIME_FRAMES 1800     /* blank CMOS: let the game restore its factory settings */
 
 #define WHITE 0xFFFFFFu
 #define GREY 0x606060u
@@ -67,6 +78,9 @@ typedef struct {
     int page;            /* 0 the card, then image pages */
     int image_pages;
     int first_image[MAX_ROM_IMAGES + 1]; /* first catalogue entry on each image page */
+    int test_card;       /* --test-card, or no ROM: the card instead of the game */
+    Board board;
+    int cmos_wait;       /* frames until changed CMOS is written */
 } Game;
 
 static Game g;
@@ -186,14 +200,67 @@ static void draw_images(Framebuffer *t)
     layout_images(g.page - 1, t);
 }
 
+/* ---- the game --------------------------------------------------------------- */
+
+/* With blank CMOS the arcade restores its factory settings and then waits for
+   a reset; run that headless once, as the MAME tests prime their CMOS. */
+static void board_start(void)
+{
+    static uint8_t cmos[BOARD_CMOS_SIZE];
+    if (!save_load(CMOS_FILE, cmos, sizeof cmos)) {
+        board_init(&g.board, &g.rom, cmos);
+        return;
+    }
+    board_init(&g.board, &g.rom, NULL);
+    for (int i = 0; i < PRIME_FRAMES; i++) board_run_frame(&g.board, NULL);
+    memcpy(cmos, g.board.cmos, sizeof cmos);
+    board_init(&g.board, &g.rom, cmos);
+    g.board.cmos_dirty = 1;
+}
+
+static void save_cmos(void)
+{
+    if (!g.board.cmos_dirty) return;
+    if (save_store(CMOS_FILE, g.board.cmos, sizeof g.board.cmos))
+        fprintf(stderr, "joust: cannot save %s\n", save_path(CMOS_FILE));
+    g.board.cmos_dirty = 0;
+}
+
+/* The port's controls as the cabinet's switches (emu/board.h). */
+static void board_inputs(const InputFrame *in)
+{
+    Board *b = &g.board;
+    uint8_t *inp[PLAYERS] = { &b->inp1, &b->inp2 };
+    for (int p = 0; p < PLAYERS; p++)
+        *inp[p] = (uint8_t)((in->p[p].move_x < 0 ? INP_LEFT : 0) | (in->p[p].move_x > 0 ? INP_RIGHT : 0) |
+                            (in->p[p].flap ? INP_FLAP : 0));
+    b->in0 = (uint8_t)((in->start ? IN0_START1 : 0) | (in->start2 ? IN0_START2 : 0));
+    b->in2 = (uint8_t)((in->coin ? IN2_COIN1 : 0) | (in->menu_held ? IN2_ADVANCE : 0));
+}
+
 /* Classic: the arcade frame. HD: drawn at the render scale. FILTER: the arcade
-   frame upscaled whole. Glow goes over whichever is shown. */
+   frame upscaled whole. Glow goes over whichever is shown. The game's frame is
+   only pixels, so its HD presets upscale it like FILTER. */
 static void draw(int display_scale)
 {
-    const GfxSettings *gs = &g.gfx;
+    GfxSettings gfx = g.gfx;
+    if (!g.test_card && gfx.mode == GFX_HD) gfx.mode = GFX_FILTER;
+    const GfxSettings *gs = &gfx;
     const Scaler scaler = gs->smooth ? SCALER_SMOOTH : SCALER_CRISP;
     const int s = gfx_render_scale(gs, display_scale);
     shown = &fb;
+    if (!g.test_card) { /* the board drew the frame into fb */
+        if (g.gfx_notice > 0) {
+            char text[80];
+            snprintf(text, sizeof text, "GRAPHICS: %s", gfx_describe(&g.gfx));
+            fill_rectf(&fb, 0, FB_HEIGHT - 9, FB_WIDTH, 9, 0x000000);
+            centred(&fb, FB_HEIGHT - 7, text, YELLOW);
+        }
+        if (gs->mode == GFX_FILTER && !fb_init(&fb_big, s) && !enhance_filter_frame(&fb, &fb_big, scaler))
+            shown = &fb_big;
+        if (gs->glow) enhance_glow(shown);
+        return;
+    }
     void (*scene)(Framebuffer *) = g.page ? draw_images : draw_scene;
     if (gs->mode == GFX_HD && !fb_init(&fb_big, s) && !enhance_prepare(s, scaler)) {
         scene(&fb_big);
@@ -211,9 +278,18 @@ static void step(const InputFrame *in)
     static bool coin_was;
     g.clock++;
     g.in = *in;
+    if (!g.test_card) {
+        board_inputs(in);
+        board_run_frame(&g.board, &fb);
+        audio_stream(g.board.sound.out, g.board.sound.out_len, BOARD_AUDIO_RATE);
+        if (g.board.cmos_dirty && --g.cmos_wait <= 0) {
+            save_cmos();
+            g.cmos_wait = CMOS_SAVE_FRAMES;
+        }
+    }
     if (in->coin && !coin_was) g.coins++;
     coin_was = in->coin;
-    if (in->operator_menu) g.page = g.have_sheet ? (g.page + 1) % (g.image_pages + 1) : 0;
+    if (g.test_card && in->operator_menu) g.page = g.have_sheet ? (g.page + 1) % (g.image_pages + 1) : 0;
     if (in->gfx_next || in->gfx_glow || in->gfx_scanlines) {
         if (in->gfx_next) gfx_next_preset(&g.gfx);
         if (in->gfx_glow) g.gfx.glow = !g.gfx.glow;
@@ -273,6 +349,60 @@ static int save_screenshot(const char *path)
     return 0;
 }
 
+/* ---- scripted input ------------------------------------------------------- */
+
+typedef struct {
+    long frame;
+    InputFrame in;
+} ScriptLine;
+
+static ScriptLine script[4096];
+static int script_len, script_pos;
+
+static int load_script(const char *path)
+{
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        fprintf(stderr, "joust: cannot open %s\n", path);
+        return -1;
+    }
+    char line[256];
+    while (script_len < (int)(sizeof script / sizeof script[0]) && fgets(line, sizeof line, f)) {
+        if (line[0] == '#' || line[0] == '\n') continue;
+        ScriptLine *l = &script[script_len];
+        memset(l, 0, sizeof *l);
+        char *tok = strtok(line, " \t\n");
+        if (!tok) continue;
+        l->frame = strtol(tok, NULL, 10);
+        while ((tok = strtok(NULL, " \t\n"))) {
+            if (!strcmp(tok, "coin")) l->in.coin = true;
+            else if (!strcmp(tok, "start")) l->in.start = true;
+            else if (!strcmp(tok, "start2")) l->in.start2 = true;
+            else if (!strcmp(tok, "menu")) l->in.menu_held = true;
+            else if (!strcmp(tok, "left")) l->in.p[0].move_x = -1;
+            else if (!strcmp(tok, "right")) l->in.p[0].move_x = 1;
+            else if (!strcmp(tok, "flap")) l->in.p[0].flap = true;
+            else if (!strcmp(tok, "left2")) l->in.p[1].move_x = -1;
+            else if (!strcmp(tok, "right2")) l->in.p[1].move_x = 1;
+            else if (!strcmp(tok, "flap2")) l->in.p[1].flap = true;
+            else fprintf(stderr, "joust: %s: unknown token '%s'\n", path, tok);
+        }
+        script_len++;
+    }
+    fclose(f);
+    return 0;
+}
+
+/* Replace live controls with the script line in force at `frame` (quit stays live). */
+static void apply_script(InputFrame *in, long frame)
+{
+    while (script_pos + 1 < script_len && script[script_pos + 1].frame <= frame) script_pos++;
+    bool quit = in->quit;
+    if (script[script_pos].frame <= frame) *in = script[script_pos].in;
+    else memset(in, 0, sizeof *in);
+    in->quit = quit;
+}
+
 /* ---- loop ----------------------------------------------------------------- */
 
 /* Loop state, static so the browser can run one pass per animation frame. */
@@ -299,6 +429,7 @@ static bool run_once(void)
 #ifndef __EMSCRIPTEN__
         if (in.quit) return false; /* a browser tab has nothing to quit to */
 #endif
+        if (script_len) apply_script(&in, frames + 1);
         step(&in);
         frames++;
         acc -= step_ticks;
@@ -334,6 +465,10 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) screenshot = argv[++i];
         else if (!strcmp(argv[i], "--rom") && i + 1 < argc) rom_arg = argv[++i];
         else if (!strcmp(argv[i], "--page") && i + 1 < argc) g.page = (int)strtol(argv[++i], NULL, 10);
+        else if (!strcmp(argv[i], "--test-card")) g.test_card = 1;
+        else if (!strcmp(argv[i], "--input") && i + 1 < argc) {
+            if (load_script(argv[++i])) return 2;
+        }
         else if (!strcmp(argv[i], "--gfx") && i + 1 < argc) {
             if (gfx_parse(argv[++i], &g.gfx)) {
                 fprintf(stderr, "joust: unknown --gfx preset '%s' (one of: %s)\n", argv[i], gfx_preset_names());
@@ -341,7 +476,8 @@ int main(int argc, char **argv)
             }
         } else {
             fprintf(stderr,
-                    "usage: %s [--windowed] [--gfx preset] [--rom path] [--page N] [--frames N] [--screenshot out.png]\n"
+                    "usage: %s [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N]\n"
+                    "          [--input script.txt] [--frames N] [--screenshot out.png]\n"
                     "       %s --check-rom <dir|zip>\n"
                     "       %s --dump-rom <dir|zip> <first> <last>\n"
                     "       %s --list-images\n",
@@ -367,6 +503,9 @@ int main(int argc, char **argv)
         g.image_pages = layout_images(-1, NULL);
     }
     if (g.page < 0 || g.page > g.image_pages) g.page = 0;
+    if (g.page) g.test_card = 1;
+    if (!g.rom.loaded) g.test_card = 1; /* nothing to run: show why */
+    if (!g.test_card) board_start();
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0) {
         SDL_Log("SDL_Init: %s", SDL_GetError());
@@ -389,6 +528,7 @@ int main(int argc, char **argv)
 #endif
     while (run_once()) {}
 
+    if (!g.test_card) save_cmos();
     audio_shutdown();
     input_shutdown();
     video_shutdown();

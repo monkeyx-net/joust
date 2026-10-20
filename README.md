@@ -4,10 +4,10 @@ A C11 / SDL2 rebuild of the 1982 Williams arcade game for Linux handhelds
 (PortMaster: ArkOS, ROCKNIX, muOS, Knulli), desktops (Linux, Windows) and the
 web, checked against the original ROM running in MAME.
 
-**Status:** P1 in progress. The ROM loader, the MAME reference pipeline, video
-and blitter emulation checked against MAME, and a test card (ROM status,
-two-player input tester, graphics presets, the images decoded from the ROM)
-work; the game itself is still to come. See [JOUST_PORT_PLAN.md](JOUST_PORT_PLAN.md).
+**Status:** playable. The game is your ROM's own code on an emulated Williams
+board (6809 main board, 6808 sound board), written in C and checked against
+MAME cycle for cycle; the port adds enhanced graphics presets, pad controls,
+CMOS saving and packaging for handhelds, desktops and the web. See [JOUST_PORT_PLAN.md](JOUST_PORT_PLAN.md).
 
 You need your own MAME `joust` ROM set (`joust.zip`); none is included.
 

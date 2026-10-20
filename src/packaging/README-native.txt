@@ -1,10 +1,15 @@
-Joust (native SDL2 build) - work in progress
-============================================
+Joust (native SDL2 build)
+=========================
 
 Run ./joust, or joust.exe on Windows (add --windowed for a window on a
-desktop). This early build shows a test card: ROM status, a two-player
-input tester and the graphics presets, and (Select+R1 / F2) pages of the
-images it decodes from your ROM. The game itself is still to come.
+desktop). The game is your ROM's own code on an emulated Williams board,
+with sound; the port adds the graphics presets, pad controls and saving.
+On the first start the arcade restores its factory settings (a moment's
+work, done before the window opens). Your settings and high scores (the
+arcade's CMOS) are saved as joust.cmos in $JOUST_SAVE_DIR, else
+$XDG_DATA_HOME/joust, %APPDATA%\joust on Windows, or ~/.local/share/joust.
+./joust --test-card shows the ROM status, an input tester and the images
+decoded from your ROM.
 
 ROM set
   The game needs your own MAME joust ROM set. Put joust.zip (or a joust/
@@ -17,12 +22,13 @@ Controls (player 1 / player 2)
   Flap: A, B, X or Y; keyboard Space or Ctrl / W
   Coin: Select / 5
   Start: Start / 1 or Enter;  2-player start: L1+Start / 2
-  Operator menu: Select+R1 / F2
+  Operator menu: Select+R1 / F2 (the cabinet's Advance button)
   Graphics: Select+L1 / F3 steps the presets, F4 glow, F5 CRT scanlines
   Exit: hold Select+Start for 1 second / Esc
   The first pad is player 1, the second player 2.
 
 Graphics presets (--gfx <preset>)
   classic, classic-crt, crisp, smooth, hd-crisp, hd-smooth, hd-glow, hd-glow-crt
+  (in the game the hd- presets upscale the whole picture, like crisp/smooth)
 
 See NOTICE for the third-party material this project refers to.

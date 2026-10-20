@@ -25,6 +25,14 @@ the ROM, running in MAME, is the only reference.
    1 s = exit (as Robotron). Keyboard: P1 arrows + Space/Ctrl, P2 A/D + W.
 5. **Enhanced graphics** as in the Robotron port (FILTER and HD presets,
    glow, scanlines), cosmetic only, classic by default.
+6. **Run the ROM's code** (2026-10-20, replacing the rewrite of P2-P5): the
+   game is the player's ROM running on an emulated board (`src/emu/`: a 6809,
+   the Williams main board with PIAs, interrupts, blitter and CMOS, and the
+   sound board's 6800 and DAC), written in C for this port (no MAME code).
+   The port supplies the platform layer, enhanced graphics, input, saving and
+   packaging. MAME stays the reference: `mame_emu` checks the board against
+   it. Decision 1 still holds: the program contains no ROM data. The P2 notes
+   below remain useful for later work (e.g. HD sprites from the blit list).
 
 ## 2. Hardware (Williams first generation)
 
@@ -135,7 +143,9 @@ game's RAM map.
 |---|---|---|
 | P0 | Repo, ROM set loader (CRC matching, zip or folder), MAME pipeline, platform layer, test card, packaging, CI (done 2026-10-20) | `enhance`, `rom_load`, `mame_rom_map` pass |
 | P1 | (done 2026-10-20 bar later-wave-only images: video and palette decoding, blitter emulation, 166 named images checked against MAME) Graphics from the ROM: find the image tables (ostriches, buzzards, knights, pterodactyl, eggs, platforms, lava, troll hand, font) and the palette; extractor writes `assets/` at first run | Extracted frames drawn by the port match MAME screenshots of the same scenes |
-| P2 | (started 2026-10-20: PRNG ported and checked) Reverse engineering: RAM map, object lists, PRNG, flap and gravity physics, collisions and joust outcome, wave tables and spawn rules | Lua probes dump each documented variable; notes in this plan |
+| E1 | (done 2026-10-20) Emulated board: 6809 core, main board, sound board; the game plays from the player's ROM with sound | `mame_emu`: 20000 random-state changes and three frames equal MAME's; instruction traces of frames 600-900 matched cycle for cycle |
+| E2 | Polish: HD presets drawing upscaled sprites from the board's blit list, settings persistence, web build with IndexedDB CMOS, device testing | Device checklist |
+| P2 | (superseded by decision 6; PRNG and kernel notes kept) Reverse engineering: RAM map, object lists, PRNG, flap and gravity physics, collisions and joust outcome, wave tables and spawn rules | Lua probes dump each documented variable; notes in this plan |
 | P3 | Sim, wave 1: player, Bounders, eggs and hatching, platforms, scoring, death and respawn, deterministic from scripted input | Per-frame traces equal MAME's for scripted wave-1 games |
 | P4 | Full game: all wave types (egg, survival, gladiator, pterodactyl), Hunters and Shadow Lords, troll hand, lava, crumbling platforms, extra lives, 2 players | Traces match MAME through wave 10 |
 | P5 | Presentation: attract mode, high-score table and entry, operator menu (CMOS settings), sound (6808 + DAC emulation of the sound ROM, or player-side capture) | Device checklist on 3 handhelds + Steam Deck |

@@ -36,6 +36,7 @@ add_library(joust_core STATIC
   src/assets/rom.c
   src/assets/assets.c
   src/assets/images.c
+  src/assets/savefile.c
   src/gfx/fb.c
   src/gfx/blit.c
   src/gfx/scale.c
@@ -46,6 +47,8 @@ add_library(joust_core STATIC
   src/emu/m6809.c
   src/emu/pia6821.c
   src/emu/board.c
+  src/emu/m6800.c
+  src/emu/sound.c
 )
 target_include_directories(joust_core PUBLIC src)
 target_link_libraries(joust_core PUBLIC m)

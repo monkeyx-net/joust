@@ -10,7 +10,9 @@
  * line 246. VA11 (scanline bit 5) drives CB1 of the second PIA, interrupting
  * 4 times a frame; COUNT240 drives its CA1. Each visible line is drawn into
  * the framebuffer as the beam passes it. Instruction for instruction and
- * cycle for cycle this matches MAME (the mame_emu test).
+ * cycle for cycle this matches MAME (the mame_emu test). The sound board
+ * (emu/sound.c) runs alongside, line by line; a frame's audio is
+ * BOARD_AUDIO_RATE / BOARD_AUDIO_FPS samples.
  */
 #ifndef JOUST_BOARD_H
 #define JOUST_BOARD_H
@@ -20,12 +22,16 @@
 #include "assets/rom.h"
 #include "emu/m6809.h"
 #include "emu/pia6821.h"
+#include "emu/sound.h"
 #include "gfx/fb.h"
 #include "gfx/williams.h"
 
 #define BOARD_LINES 260
 #define BOARD_CYCLES_PER_LINE 64
 #define BOARD_FIRST_LINE 247 /* frames start at vertical blank, as MAME's do */
+#define BOARD_FRAME_HZ (1e6 / (BOARD_LINES * BOARD_CYCLES_PER_LINE)) /* 60.096 */
+#define BOARD_AUDIO_RATE 48000
+#define BOARD_AUDIO_FPS 60 /* the sound is made for this many frames a second (the port's tick) */
 #define BOARD_CMOS_SIZE 1024
 
 /* Inputs, active high, as MAME's ports */
@@ -58,9 +64,8 @@ struct Board {
     int scanline;
     long frame;
     uint8_t in0, inp1, inp2, in2;
-    /* the sound board's command latch (PIA 1 port B, top bits set) */
-    uint8_t sound_cmd;
-    int sound_cmd_new;
+    /* the sound board; its samples for the last frame are in sound.out */
+    Sound sound;
     /* optional: called on every CPU write (tests trace RAM through this) */
     void (*write_hook)(Board *b, uint16_t addr, uint8_t value);
     /* optional: called at the start of each line (scripted input timing) */

@@ -16,9 +16,10 @@ improvements to that shared code may be worth carrying across, but ask first.
 
 ## Ground Rules
 
-- **MAME is the behaviour reference.** There is no remake to port from: every
-  behaviour comes from the ROM, read in MAME (RAM probes, per-frame traces)
-  and documented in the plan. Cite ROM addresses in short comments.
+- **The game is the ROM's own code** on the emulated board (`src/emu/`, plan
+  decision 6). MAME is the reference for the emulation: changes to `emu/`
+  must keep `mame_emu` (and the other `mame` tests) passing. Write all
+  emulation from the hardware's behaviour, not from MAME's source.
 - **No ROM-derived data in the repo or the binary** (plan, decision 1). Not
   sprites, fonts, tables or sounds: the program reads the player's ROM set at
   run time (or extracts it to `assets/` on first run).
@@ -37,7 +38,8 @@ cmake -S . -B build && cmake --build build -j     # build
 ctest --test-dir build                            # all tests
 ctest --test-dir build -L rom                     # tests needing the ROM set (roms/joust.zip)
 ctest --test-dir build -L mame                    # tests needing MAME + the ROM set
-build/joust --windowed                            # run (finds roms/joust.zip in dev builds)
+build/joust --windowed                            # play (finds roms/joust.zip in dev builds)
+build/joust --windowed --test-card                # the test card and image pages
 build/joust --windowed --gfx hd-glow              # enhanced graphics (presets: classic ... hd-glow-crt)
 SDL_VIDEODRIVER=dummy build/joust --frames 60 --screenshot out.png   # headless screenshot
 build/joust --check-rom roms/joust.zip            # verify a ROM set
@@ -53,8 +55,12 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
 
 ## Layout (`src/`)
 
-- `main.c` - SDL setup, fixed 60 Hz loop, the test card, graphics pipeline,
-  `--frames`, `--screenshot`, `--rom`, `--check-rom`, `--dump-rom`
+- `main.c` - SDL setup, fixed 60 Hz loop running one board frame per tick,
+  the graphics pipeline, CMOS saving, the test card (`--test-card`),
+  `--input`, `--frames`, `--screenshot`, `--rom`, `--check-rom`, `--dump-rom`
+- `emu/` - the emulated hardware: `m6809.c` (main CPU), `pia6821.c`,
+  `board.c` (Joust's main board: memory map, interrupts, blitter, CMOS,
+  video per line), `m6800.c` + `sound.c` (the sound board and its DAC)
 - `platform/` - the only code that includes SDL: `video.c` (292x240 framebuffer
   at any scale, integer scaling, scanline overlay), `input.c` (two players:
   move + flap; pads and keyboard), `audio.c` (priority mixer; the game
@@ -64,12 +70,12 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   presets, HD image registry, whole-frame filter, glow), `debugfont.c` (3x5
   font for diagnostics, not the ROM's), `williams.c` (video RAM and palette
   decoding, the SC1 blitter as MAME emulates it)
-- `assets/` - `rom.c` (the joust set from a zip or folder, matched by CRC;
+- `assets/` - `savefile.c` (the save folder: joust.cmos), `rom.c` (the joust set from a zip or folder, matched by CRC;
   CPU address map), `images.c` (the image catalogue: ROM addresses and
   sizes, decoded through the blitter and the ROM's palette), `zip.c`,
   `inflate.c`, `png.c` (RGB and RGBA), `assets.c` (asset folder lookup)
-- `sim/` - pure C game simulation, no SDL, no drawing: `prng.c` (the ROM's
-  random number generator at $E4C0, and the IRQ's stir)
+- `sim/` - `prng.c` (the ROM's random number generator at $E4C0, and the
+  IRQ's stir), from the reverse engineering before decision 6
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
 - `web/` - page shell for the Emscripten build
@@ -104,6 +110,13 @@ Every change keeps `ctest` green.
   A052=05` for unlimited lives once a game runs).
 - `mame_prng` - label `mame`: every stir and step of the random state from
   power-on, replayed through `sim/prng.c`
+- `mame_emu` - label `mame`: the emulated board from power-on with the primed
+  CMOS and the probes' script: all 20000 random-state changes in MAME's order
+  and frames 1500/1650/1800 pixel for pixel. Inputs a probe sets in a frame
+  callback reach the game at the start of the frame after next. To debug a
+  timing difference, compare instruction traces: MAME's debugger `trace` with
+  `tracelog "%d ",totalcycles` (needs `-debug -debugger none`) against
+  `Board.step_hook`; MAME's frames start at line 247, reset takes 4 cycles.
 - More RE probes: `access_probe.lua` (which code reads and writes given addresses)
 - MAME tests share `build/mame` (one at a time) and start each run from a
   fresh copy of the primed CMOS (`src/tests/mame/mame_common.cmake`); MAME
