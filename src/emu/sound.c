@@ -80,6 +80,7 @@ void sound_run(Sound *s, int64_t until)
 {
     while (s->cpu.cycles < until) {
         uint8_t level = s->dac; /* the level before this instruction's writes */
+        if (s->step_hook) s->step_hook(s->user, &s->cpu);
         double cyc = m6800_step(&s->cpu);
         while (cyc >= s->sample_left) {
             s->acc += level * s->sample_left;

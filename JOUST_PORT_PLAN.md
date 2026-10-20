@@ -121,6 +121,20 @@ game's RAM map.
 - Next: the object structures that tasks build display-list nodes from;
   then flap, gravity and collisions.
 
+### Board timing (from the Defender port, 2026-10-20)
+
+Found by comparing instruction traces in the Defender port (`../defender`,
+same board family) and carried across; Joust's tests still pass, and 15
+MAME frames of play with movement (1400-2400) match pixel for pixel:
+- A write to PIA port B's data direction register also changes the pins.
+- The sound CPU catches up to the main CPU before a command reaches it;
+  the command lands as the main CPU's store instruction ends.
+- The video counter gives the beam's line when the load's read lands, at
+  the instruction's end (`M6809.op_end`), not at its start.
+- Each line is drawn whole from RAM and the palette as they are 2 cycles
+  before the line starts; a store or blit landing after that waits for it.
+- `Sound.step_hook` traces the sound CPU.
+
 ## 3. Test plan
 
 - **Unit** (`ctest`, no ROM): scalers, presets, blitter, glow (`enhance`);

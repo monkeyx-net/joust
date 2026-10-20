@@ -31,6 +31,9 @@ typedef struct {
     double dc_in, dc_out;     /* DC blocker state */
     int16_t out[SOUND_MAX_SAMPLES];
     int out_len;
+    /* optional: called before each CPU step (instruction traces) */
+    void (*step_hook)(void *user, const M6800 *cpu);
+    void *user;
 } Sound;
 
 /* cycles_per_sample: sound CPU cycles per output sample (the board picks it

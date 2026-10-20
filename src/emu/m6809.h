@@ -28,6 +28,8 @@ typedef struct M6809 {
     int waiting;             /* 1 after CWAI (state pushed), 2 after SYNC */
     int last_interrupt;      /* the last step took an interrupt (traces) */
     int64_t cycles;          /* total executed (64-bit: hours of play on any platform) */
+    int64_t op_end;          /* during an instruction: the cycle it ends at (its base cost;
+                                indexed modes may add more), when a load's last-cycle read lands */
     void *ctx;
     uint8_t (*read)(void *ctx, uint16_t addr);
     void (*write)(void *ctx, uint16_t addr, uint8_t value);

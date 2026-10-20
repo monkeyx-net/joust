@@ -66,6 +66,11 @@ struct Board {
     uint8_t in0, inp1, inp2, in2;
     /* the sound board; its samples for the last frame are in sound.out */
     Sound sound;
+    int sound_pending;       /* a command written this instruction, sent when it ends */
+    uint8_t sound_latch;
+    Framebuffer *fb;         /* during board_run_frame: where lines are drawn, or NULL */
+    int next_line, next_drawn;
+    int64_t next_line_start;
     /* optional: called on every CPU write (tests trace RAM through this) */
     void (*write_hook)(Board *b, uint16_t addr, uint8_t value);
     /* optional: called at the start of each line (scripted input timing) */

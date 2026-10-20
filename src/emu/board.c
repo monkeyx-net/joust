@@ -20,11 +20,27 @@ static uint8_t pia0_read_a(void *ctx)
 static uint8_t pia0_read_b(void *ctx) { (void)ctx; return 0; }
 static void pia0_cb2(void *ctx, int level) { ((Board *)ctx)->mux_select = level; }
 static uint8_t pia1_read_a(void *ctx) { return ((Board *)ctx)->in2; }
+/* The sound board's clock for a main-CPU cycle count. */
+static int64_t sound_cycles(int64_t main_cycles) { return (int64_t)((double)main_cycles * SOUND_CPU_HZ / 1e6); }
+
+/* A command reaches the sound board when the store's bus cycle ends (the
+   instruction's last cycle): it is held until the main CPU's instruction is
+   done, the sound CPU catches up to that moment, then the latch changes. */
 static void pia1_write_b(void *ctx, uint8_t pins)
 {
     Board *b = ctx;
-    sound_command(&b->sound, pins | 0xC0); /* the top two bits are pulled up on the board */
+    b->sound_pending = 1;
+    b->sound_latch = pins | 0xC0; /* the top two bits are pulled up on the board */
 }
+
+static void send_sound_command(Board *b)
+{
+    b->sound_pending = 0;
+    sound_run(&b->sound, sound_cycles(b->cpu.cycles));
+    sound_command(&b->sound, b->sound_latch);
+}
+
+static void beam_catch_up(Board *b);
 
 /* ---- memory map ------------------------------------------------------------ */
 
@@ -35,7 +51,10 @@ static uint8_t bus_read(void *ctx, uint16_t a)
     if (a < WILLIAMS_VRAM_SIZE) return b->ram[a];
     if (a >= 0xD000) return (uint8_t)rom_byte(b->rom, a);
     if (a >= 0xCC00) return b->cmos[a - 0xCC00];
-    if (a >= 0xCB00) return (uint8_t)(b->scanline & 0xFC); /* video counter */
+    if (a >= 0xCB00) { /* video counter: the beam's line as the read lands, at the load's last cycle */
+        int line = (int)((BOARD_FIRST_LINE + b->cpu.op_end / BOARD_CYCLES_PER_LINE) % BOARD_LINES);
+        return (uint8_t)(line & 0xFC);
+    }
     if ((a & 0xFF0C) == 0xC804) {
         uint8_t v = pia_read(&b->pia[0], a & 3);
         update_irq(b);
@@ -52,6 +71,7 @@ static uint8_t bus_read(void *ctx, uint16_t a)
 static void blit_start(Board *b, uint8_t ctrl)
 {
     WilliamsBus bus = { b->ram, b->rom, b->romsel & 1 };
+    beam_catch_up(b);
     uint16_t src = (uint16_t)(b->blit[2] << 8 | b->blit[3]), dst = (uint16_t)(b->blit[4] << 8 | b->blit[5]);
     williams_blit(&bus, ctrl, b->blit[1], src, dst, b->blit[6], b->blit[7]);
     /* MAME's timing for the SC1 blitter: the CPU waits for it */
@@ -68,6 +88,7 @@ static void bus_write(void *ctx, uint16_t a, uint8_t v)
     Board *b = ctx;
     if (b->write_hook) b->write_hook(b, a, v);
     if (a < WILLIAMS_VRAM_SIZE) {
+        beam_catch_up(b);
         b->ram[a] = v; /* writes always reach RAM, ROM selected or not */
         return;
     }
@@ -98,7 +119,10 @@ static void bus_write(void *ctx, uint16_t a, uint8_t v)
         update_irq(b);
         return;
     }
-    if (a < 0xC400) b->palette[a & 0x0F] = v; /* $C000-$C00F, mirrored to $C3FF */
+    if (a < 0xC400) { /* $C000-$C00F, mirrored to $C3FF */
+        beam_catch_up(b);
+        b->palette[a & 0x0F] = v;
+    }
 }
 
 /* ---- frame ------------------------------------------------------------------ */
@@ -140,12 +164,30 @@ static void draw_line(const Board *b, Framebuffer *fb, int line)
     }
 }
 
+/* Each line is drawn whole, from RAM and the palette as they are BEAM_LEAD
+   cycles before the line starts (measured against MAME's frames in the
+   Defender port: 2 or 3 match every captured frame, 0-1 and 4 or more do
+   not). A store or blit lands on its instruction's last cycle: when that is
+   too late for the next line, the line is drawn first, from what RAM held
+   before. */
+#define BEAM_LEAD 2
+
+static void beam_catch_up(Board *b)
+{
+    if (b->fb && !b->next_drawn && b->cpu.op_end >= b->next_line_start - BEAM_LEAD) {
+        draw_line(b, b->fb, b->next_line);
+        b->next_drawn = 1;
+    }
+}
+
 /* A frame runs from the start of vertical blank (line 247, where MAME's
    screen starts at power-on and where its frames end) to the last visible
    line, 246: the frame's picture is complete when it returns. */
 void board_run_frame(Board *b, Framebuffer *fb)
 {
     b->sound.out_len = 0;
+    b->fb = fb && fb->scale == 1 ? fb : NULL;
+    b->next_drawn = 1;
     for (int i = 0; i < BOARD_LINES; i++) {
         int line = (BOARD_FIRST_LINE + i) % BOARD_LINES;
         b->scanline = line;
@@ -154,13 +196,19 @@ void board_run_frame(Board *b, Framebuffer *fb)
         if (line == 240) pia_ca1(&b->pia[1], 1);                                    /* COUNT240 */
         if (line == 0) pia_ca1(&b->pia[1], 0);
         update_irq(b);
+        if (b->fb && !b->next_drawn) draw_line(b, b->fb, line);
         int64_t end = (b->frame * BOARD_LINES + i + 1) * (int64_t)BOARD_CYCLES_PER_LINE;
+        /* the next line, which a store late in this one may have to draw early */
+        b->next_line = (line + 1) % BOARD_LINES;
+        b->next_line_start = end;
+        b->next_drawn = i + 1 == BOARD_LINES; /* the next frame's first line belongs to it */
         while (b->cpu.cycles < end) {
             if (b->step_hook) b->step_hook(b);
             m6809_step(&b->cpu);
+            if (b->sound_pending) send_sound_command(b);
         }
-        sound_run(&b->sound, (int64_t)((double)end * SOUND_CPU_HZ / 1e6));
-        if (fb && fb->scale == 1) draw_line(b, fb, line);
+        sound_run(&b->sound, sound_cycles(end));
     }
     b->frame++;
+    b->fb = NULL;
 }

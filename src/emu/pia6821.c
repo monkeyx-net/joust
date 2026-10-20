@@ -70,8 +70,7 @@ void pia_write(Pia *p, int reg, uint8_t v)
     case 2:
         if (p->b.cr & CR_DDR_ACCESS) p->b.out = v;
         else p->b.ddr = v;
-        if ((p->b.cr & CR_DDR_ACCESS) && p->write_b)
-            p->write_b(p->ctx, (uint8_t)((p->b.out & p->b.ddr) | ~p->b.ddr));
+        if (p->write_b) p->write_b(p->ctx, (uint8_t)((p->b.out & p->b.ddr) | ~p->b.ddr));
         break;
     default:
         write_cr(p, &p->b, 1, v);

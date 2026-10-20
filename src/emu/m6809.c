@@ -703,12 +703,14 @@ int m6809_step(M6809 *c)
         uint8_t op2 = fetch8(c);
         while (op2 == 0x10 || op2 == 0x11) op2 = fetch8(c); /* repeated prefixes */
         cyc = 0;
+        c->op_end = c->cycles;
         if (!prefixed(c, page, op2, &cyc)) { /* undefined there: runs as page 0 */
             cyc = CYCLES[op2] + 1;
             page0(c, op2, &cyc);
         }
     } else {
         cyc = CYCLES[op];
+        c->op_end = c->cycles + cyc;
         page0(c, op, &cyc);
     }
     c->cycles += cyc;
