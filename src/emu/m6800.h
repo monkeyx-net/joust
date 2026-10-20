@@ -13,7 +13,7 @@ typedef struct M6800 {
     uint16_t x, sp, pc;
     int irq, nmi, nmi_prev;
     int waiting;      /* after WAI: state pushed, idle until an interrupt */
-    long cycles;
+    int64_t cycles;
     void *ctx;
     uint8_t (*read)(void *ctx, uint16_t addr);
     void (*write)(void *ctx, uint16_t addr, uint8_t value);

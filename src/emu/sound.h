@@ -38,6 +38,6 @@ typedef struct {
 void sound_init(Sound *s, const RomSet *rom, double cycles_per_sample);
 void sound_command(Sound *s, uint8_t cmd);
 /* Run the sound CPU until its cycle count reaches `until`. */
-void sound_run(Sound *s, long until);
+void sound_run(Sound *s, int64_t until);
 
 #endif

@@ -33,7 +33,7 @@ static void trace(Board *b, uint16_t addr, uint8_t v)
     if (got_n >= want_n) return;
     if (memcmp(line, want + got_n * 7, 6)) {
         fprintf(stderr, "random state change %ld: %s, MAME %.6s (frame %ld, line %d)\n", got_n + 1, line,
-                want + got_n * 7, b->frame, b->scanline);
+                want + got_n * 7, (long)b->frame, b->scanline);
         bad = 1;
     }
     got_n++;
@@ -42,7 +42,7 @@ static void trace(Board *b, uint16_t addr, uint8_t v)
 static void script(Board *b, int line)
 {
     if (line != BOARD_FIRST_LINE) return;
-    long f = b->frame - 1; /* the probe's frame number whose inputs apply now */
+    long f = (long)b->frame - 1; /* the probe's frame number whose inputs apply now */
     if (f == 1200) b->in2 |= IN2_COIN1;
     if (f == 1215) b->in2 &= (uint8_t)~IN2_COIN1;
     if (f == 1300) b->in0 |= IN0_START1;
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
             char *colon = strchr(argv[i], ':');
             if (!colon || strtol(argv[i], NULL, 10) != board.frame) continue;
             long d = compare_shot(&fb, colon + 1);
-            printf("frame %ld: %ld pixels differ from MAME\n", board.frame, d);
+            printf("frame %ld: %ld pixels differ from MAME\n", (long)board.frame, d);
             if (d) failed = 1;
         }
     }

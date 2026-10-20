@@ -76,7 +76,7 @@ static void emit(Sound *s)
     s->acc = 0;
 }
 
-void sound_run(Sound *s, long until)
+void sound_run(Sound *s, int64_t until)
 {
     while (s->cpu.cycles < until) {
         uint8_t level = s->dac; /* the level before this instruction's writes */

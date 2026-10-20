@@ -27,7 +27,7 @@ typedef struct M6809 {
     int nmi_prev;
     int waiting;             /* 1 after CWAI (state pushed), 2 after SYNC */
     int last_interrupt;      /* the last step took an interrupt (traces) */
-    long cycles;             /* total executed */
+    int64_t cycles;          /* total executed (64-bit: hours of play on any platform) */
     void *ctx;
     uint8_t (*read)(void *ctx, uint16_t addr);
     void (*write)(void *ctx, uint16_t addr, uint8_t value);

@@ -154,12 +154,12 @@ void board_run_frame(Board *b, Framebuffer *fb)
         if (line == 240) pia_ca1(&b->pia[1], 1);                                    /* COUNT240 */
         if (line == 0) pia_ca1(&b->pia[1], 0);
         update_irq(b);
-        long end = (b->frame * BOARD_LINES + i + 1) * (long)BOARD_CYCLES_PER_LINE;
+        int64_t end = (b->frame * BOARD_LINES + i + 1) * (int64_t)BOARD_CYCLES_PER_LINE;
         while (b->cpu.cycles < end) {
             if (b->step_hook) b->step_hook(b);
             m6809_step(&b->cpu);
         }
-        sound_run(&b->sound, (long)((double)end * SOUND_CPU_HZ / 1e6));
+        sound_run(&b->sound, (int64_t)((double)end * SOUND_CPU_HZ / 1e6));
         if (fb && fb->scale == 1) draw_line(b, fb, line);
     }
     b->frame++;

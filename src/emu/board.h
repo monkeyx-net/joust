@@ -62,7 +62,7 @@ struct Board {
     Pia pia[2];
     int mux_select;          /* PIA 0 CB2: which player's controls PA 0-3 shows */
     int scanline;
-    long frame;
+    int64_t frame;
     uint8_t in0, inp1, inp2, in2;
     /* the sound board; its samples for the last frame are in sound.out */
     Sound sound;
