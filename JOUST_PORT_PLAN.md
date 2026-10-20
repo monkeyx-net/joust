@@ -77,7 +77,12 @@ game's RAM map.
   riders and lances in each colour, eggs and hatching knights, the troll's
   hand and the lava flames, the pterodactyl, digits, two fonts. Not yet
   seen: whatever only later waves draw (the unlimited-lives run stays on
-  the early layout). Next: name the images from the tables, then P2.
+  the early layout). Each entry is named by what it shows (groups:
+  platforms, ostrich, stork, buzzard, riders by colour, eggs, hatching,
+  troll hand, flames, sparks, pterodactyl, two fonts, life icons).
+- Table $0DF9 holds two mounts x 9 poses x 2 facings (records 2p, 2p+1 are
+  a mirrored pair): records 0-17 the stork, 18-35 the ostrich; per mount,
+  poses 0 braking, 1-5 the run cycle (pose 5 repeats pose 1), 6-8 flying.
 - `src/tests/mame/dasm_probe.lua` writes MAME's disassembly to `build/re`
   for reading the code (never commit its output).
 
@@ -102,7 +107,7 @@ game's RAM map.
 | Phase | Work | Exit criterion |
 |---|---|---|
 | P0 | Repo, ROM set loader (CRC matching, zip or folder), MAME pipeline, platform layer, test card, packaging, CI (done 2026-10-20) | `enhance`, `rom_load`, `mame_rom_map` pass |
-| P1 | (in progress: video and palette decoding, blitter emulation, 166 images found and checked against MAME, 2026-10-20) Graphics from the ROM: find the image tables (ostriches, buzzards, knights, pterodactyl, eggs, platforms, lava, troll hand, font) and the palette; extractor writes `assets/` at first run | Extracted frames drawn by the port match MAME screenshots of the same scenes |
+| P1 | (done 2026-10-20 bar later-wave-only images: video and palette decoding, blitter emulation, 166 named images checked against MAME) Graphics from the ROM: find the image tables (ostriches, buzzards, knights, pterodactyl, eggs, platforms, lava, troll hand, font) and the palette; extractor writes `assets/` at first run | Extracted frames drawn by the port match MAME screenshots of the same scenes |
 | P2 | Reverse engineering: RAM map, object lists, PRNG, flap and gravity physics, collisions and joust outcome, wave tables and spawn rules | Lua probes dump each documented variable; notes in this plan |
 | P3 | Sim, wave 1: player, Bounders, eggs and hatching, platforms, scoring, death and respawn, deterministic from scripted input | Per-frame traces equal MAME's for scripted wave-1 games |
 | P4 | Full game: all wave types (egg, survival, gladiator, pterodactyl), Hunters and Shadow Lords, troll hand, lava, crumbling platforms, extra lives, 2 players | Traces match MAME through wave 10 |

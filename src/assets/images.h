@@ -13,8 +13,9 @@
 #define MAX_ROM_IMAGES 256
 
 typedef struct {
-    uint16_t addr; /* first data byte */
-    uint8_t w, h;  /* width in bytes (2 pixels each), height in rows */
+    uint16_t addr;     /* first data byte */
+    uint8_t w, h;      /* width in bytes (2 pixels each), height in rows */
+    const char *name;  /* e.g. "ostrich 3", "font 'A'" */
 } RomImage;
 
 extern const RomImage ROM_IMAGES[];

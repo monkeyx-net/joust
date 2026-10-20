@@ -13,8 +13,8 @@
  * written as a PNG (use SDL_VIDEODRIVER=dummy to run headless).
  * --dump-rom prints "ADDR BYTE" lines (hex) for main-CPU addresses first..last,
  * the format the MAME probe writes (src/tests/mame/rom_map_probe.lua).
- * --list-images prints the image catalogue as "ADDR:W:H" (hex address, width
- * in bytes, height), the input of src/tests/mame/image_probe.lua.
+ * --list-images prints the image catalogue as "ADDR:W:H name" (hex address,
+ * width in bytes, height), the input of src/tests/mame/image_probe.lua.
  */
 #include <SDL.h>
 #include <stdio.h>
@@ -324,7 +324,8 @@ int main(int argc, char **argv)
     if (argc == 3 && !strcmp(argv[1], "--check-rom")) return check_rom(argv[2]);
     if (argc == 5 && !strcmp(argv[1], "--dump-rom")) return dump_rom(argv[2], argv[3], argv[4]);
     if (argc == 2 && !strcmp(argv[1], "--list-images")) {
-        for (int i = 0; i < ROM_IMAGE_COUNT; i++) printf("%04X:%d:%d\n", ROM_IMAGES[i].addr, ROM_IMAGES[i].w, ROM_IMAGES[i].h);
+        for (int i = 0; i < ROM_IMAGE_COUNT; i++)
+            printf("%04X:%d:%d %s\n", ROM_IMAGES[i].addr, ROM_IMAGES[i].w, ROM_IMAGES[i].h, ROM_IMAGES[i].name);
         return 0;
     }
     for (int i = 1; i < argc; i++) {
