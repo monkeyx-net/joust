@@ -23,7 +23,7 @@ static uint8_t bus_read(void *ctx, uint16_t a)
         return v;
     }
     if (a >= 0xF000) return s->rom->sound[a & 0x0FFF];
-    return 0xFF;
+    return 0; /* unmapped, and $B000-$EFFF (empty ROM sockets): 0, as in MAME */
 }
 
 static void bus_write(void *ctx, uint16_t a, uint8_t v)
