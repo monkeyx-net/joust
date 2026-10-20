@@ -43,6 +43,9 @@ add_library(joust_core STATIC
   src/gfx/debugfont.c
   src/gfx/williams.c
   src/sim/prng.c
+  src/emu/m6809.c
+  src/emu/pia6821.c
+  src/emu/board.c
 )
 target_include_directories(joust_core PUBLIC src)
 target_link_libraries(joust_core PUBLIC m)
@@ -119,6 +122,8 @@ add_executable(test_images src/tests/test_images.c)
 target_link_libraries(test_images PRIVATE joust_core)
 add_executable(test_prng src/tests/test_prng.c)
 target_link_libraries(test_prng PRIVATE joust_core)
+add_executable(test_emu src/tests/test_emu.c)
+target_link_libraries(test_emu PRIVATE joust_core)
 
 if(EXISTS "${JOUST_ROM}")
   add_executable(test_rom src/tests/test_rom.c)
@@ -153,7 +158,11 @@ if(MAME_EXECUTABLE AND EXISTS "${JOUST_ROM}")
     COMMAND ${CMAKE_COMMAND} -DMAME=${MAME_EXECUTABLE} -DROMPATH=${rom_parent} -DWORKDIR=${CMAKE_BINARY_DIR}/mame
       -DPROBE=${CMAKE_SOURCE_DIR}/src/tests/mame/prng_probe.lua -DCHECK=$<TARGET_FILE:test_prng>
       -P ${CMAKE_SOURCE_DIR}/src/tests/mame/prng.cmake)
-  set_tests_properties(mame_capture mame_images mame_prng PROPERTIES LABELS mame TIMEOUT 300 RESOURCE_LOCK mame_workdir)
+  add_test(NAME mame_emu
+    COMMAND ${CMAKE_COMMAND} -DWORKDIR=${CMAKE_BINARY_DIR}/mame -DROM=${JOUST_ROM} -DCHECK=$<TARGET_FILE:test_emu>
+      -P ${CMAKE_SOURCE_DIR}/src/tests/mame/emu.cmake)
+  set_tests_properties(mame_capture mame_images mame_prng mame_emu PROPERTIES LABELS mame TIMEOUT 300 RESOURCE_LOCK mame_workdir)
+  set_tests_properties(mame_emu PROPERTIES DEPENDS "mame_prng;mame_capture")
   set_tests_properties(mame_rom_map PROPERTIES RESOURCE_LOCK mame_workdir)
   message(STATUS "MAME reference tests enabled (${MAME_EXECUTABLE})")
 else()
