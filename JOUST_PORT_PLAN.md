@@ -98,8 +98,20 @@ game's RAM map.
   $E54F. `sim/prng.c`; `mame_prng` replays ~20000 transitions from power-on.
 - `src/tests/mame/access_probe.lua` logs who reads and writes chosen
   addresses (program counter and count): how the PRNG's users were found.
-- Next: the task scheduler behind $E037 and the object structures the
-  display list is built from; then flap, gravity and collisions.
+- Tasks (the Williams cooperative kernel): a linked list from $A00A; a task
+  node holds +0 next, +2 type, +3 a flag that defers it to the other of two
+  passes per frame ($A065), +4 frames left to wait, +5-6 the address to
+  resume at. `LDA #n; JSR $E037` ($E157) saves the caller's return address
+  in the node and sleeps n frames; the dispatcher ($E15F-$E194) counts the
+  waits down and resumes at $E152 (`STU <$2E; JMP [5,U]`; $A02E = current
+  task). $E20F ends the current task (its node goes to the free list at
+  $A008); $E24F ends every task of a type.
+- Frame loop ($E0E2): two display lists, $A9C0 and $AC21, swapped each frame
+  ($A027); it waits until the IRQ has drawn the previous one, clears four
+  layer heads ($A000-$A0C6), and sends queued sound commands to the sound
+  board through the PIA at $C80E ($A061-$A064).
+- Next: the object structures that tasks build display-list nodes from;
+  then flap, gravity and collisions.
 
 ## 3. Test plan
 
