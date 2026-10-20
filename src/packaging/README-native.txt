@@ -1,6 +1,8 @@
 Joust (native SDL2 build)
 =========================
 
+Converted by monkeyx.
+
 Run ./joust, or joust.exe on Windows (add --windowed for a window on a
 desktop). The game is your ROM's own code on an emulated Williams board,
 with sound; the port adds the graphics presets, pad controls and saving.
@@ -10,6 +12,9 @@ arcade's CMOS) are saved as joust.cmos in $JOUST_SAVE_DIR, else
 $XDG_DATA_HOME/joust, %APPDATA%\joust on Windows, or ~/.local/share/joust.
 ./joust --test-card shows the ROM status, an input tester and the images
 decoded from your ROM.
+In the attract mode, when nobody touches the controls for 30 seconds, a
+page lists the controls (and comes back every 40 seconds); any button
+hides it.
 
 ROM set
   The game needs your own MAME joust ROM set. Put joust.zip (or a joust/

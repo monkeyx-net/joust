@@ -3,7 +3,7 @@
   <game>
     <path>./Joust.sh</path>
     <name>Joust</name>
-    <desc>A native SDL2 rebuild of the 1982 Williams arcade game (work in progress). Needs your MAME joust.zip ROM set in ports/joust/.</desc>
+    <desc>A native SDL2 rebuild of the 1982 Williams arcade game (work in progress). Needs your MAME joust.zip ROM set in ports/joust/. Converted by monkeyx.</desc>
     <releasedate>19820101T000000</releasedate>
     <developer>John Newcomer</developer>
     <publisher>Williams Electronics</publisher>

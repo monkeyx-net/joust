@@ -11,6 +11,8 @@ CMOS saving and packaging for handhelds, desktops and the web. See [JOUST_PORT_P
 
 You need your own MAME `joust` ROM set (`joust.zip`); none is included.
 
+Converted by monkeyx.
+
 ```bash
 cmake -S . -B build && cmake --build build -j
 build/joust --windowed --rom /path/to/joust.zip

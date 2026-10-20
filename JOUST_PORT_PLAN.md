@@ -121,6 +121,13 @@ game's RAM map.
 - Next: the object structures that tasks build display-list nodes from;
   then flap, gravity and collisions.
 
+### Game state (2026-10-20)
+
+- $A09F: $00 in the first attract mode, $03 from a start until the game is
+  under way, $02 while a game runs (1 or 2 players), $03 again from game
+  over on (`ram_probe.lua`). The port shows its controls page over the
+  attract mode (after 30 s without input) while it is not $02.
+
 ### Board timing (from the Defender port, 2026-10-20)
 
 Found by comparing instruction traces in the Defender port (`../defender`,
