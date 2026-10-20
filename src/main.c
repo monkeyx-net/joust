@@ -1,22 +1,27 @@
 /*
  * Joust native build: SDL setup and the fixed 60 Hz loop. See JOUST_PORT_PLAN.md.
- * So far (P0): the ROM set loader and a test card (ROM status, a two-player
- * input tester, the graphics presets); the game itself is still to come.
+ * So far: the ROM set loader and a test card (ROM status, a two-player input
+ * tester, the graphics presets) with pages of the images decoded from the
+ * ROM (Select+R1 / F2 steps the pages); the game itself is still to come.
  *
- *   joust [--windowed] [--gfx preset] [--rom path] [--frames N] [--screenshot out.png]
+ *   joust [--windowed] [--gfx preset] [--rom path] [--page N] [--frames N] [--screenshot out.png]
  *   joust --check-rom <dir|zip>
  *   joust --dump-rom <dir|zip> <first> <last>
+ *   joust --list-images
  *
  * --frames N stops after N updates; with --screenshot the last frame is
  * written as a PNG (use SDL_VIDEODRIVER=dummy to run headless).
  * --dump-rom prints "ADDR BYTE" lines (hex) for main-CPU addresses first..last,
  * the format the MAME probe writes (src/tests/mame/rom_map_probe.lua).
+ * --list-images prints the image catalogue as "ADDR:W:H" (hex address, width
+ * in bytes, height), the input of src/tests/mame/image_probe.lua.
  */
 #include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "assets/images.h"
 #include "assets/png.h"
 #include "assets/rom.h"
 #include "gfx/blit.h"
@@ -57,6 +62,11 @@ typedef struct {
     char rom_path[1024];
     char rom_error[256];
     RomSet rom;
+    ImageSheet sheet;
+    int have_sheet;
+    int page;            /* 0 the card, then image pages */
+    int image_pages;
+    int first_image[MAX_ROM_IMAGES + 1]; /* first catalogue entry on each image page */
 } Game;
 
 static Game g;
@@ -108,6 +118,10 @@ static void draw_scene(Framebuffer *t)
     lamp(t, 74, 100, "START", g.in.start);
     lamp(t, 122, 100, "2P START", g.in.start2);
     lamp(t, 182, 100, "MENU", g.in.menu_held);
+    if (g.have_sheet) {
+        snprintf(line, sizeof line, "%d IMAGES DECODED FROM THE ROM: SELECT+R1 / F2 TO VIEW", ROM_IMAGE_COUNT);
+        debug_text(t, 30, 118, line, GREEN);
+    }
     snprintf(line, sizeof line, "COINS %d", g.coins);
     debug_text(t, 30, 110, line, WHITE);
 
@@ -129,6 +143,49 @@ static void draw_scene(Framebuffer *t)
     centred(t, 210, "EXIT: HOLD SELECT+START OR ESC", GREY);
 }
 
+/* ---- image pages ---------------------------------------------------------- */
+
+#define PAGE_X0 10
+#define PAGE_X1 282
+#define PAGE_Y0 26
+#define PAGE_Y1 226
+#define PAGE_GAP 4
+
+/* Lay the catalogue out in shelves; call fn for each image on `page` (or count pages). */
+static int layout_images(int page, Framebuffer *t)
+{
+    int pg = 0, x = PAGE_X0, y = PAGE_Y0, shelf = 0;
+    for (int i = 0; i < ROM_IMAGE_COUNT; i++) {
+        const ImageFrame *f = &g.sheet.frames[i];
+        if (x + f->w > PAGE_X1) {
+            x = PAGE_X0;
+            y += shelf + PAGE_GAP;
+            shelf = 0;
+        }
+        if (y + f->h > PAGE_Y1) {
+            pg++;
+            x = PAGE_X0;
+            y = PAGE_Y0;
+            shelf = 0;
+        }
+        if (t && pg == page)
+            blit(t, &g.sheet.image, f->x, f->y, f->w, f->h, x, y, 1, 0xFFFFFF);
+        x += f->w + PAGE_GAP;
+        if (f->h > shelf) shelf = f->h;
+    }
+    return pg + 1;
+}
+
+static void draw_images(Framebuffer *t)
+{
+    char line[96];
+    fb_clear(t, 0xFF000000u);
+    snprintf(line, sizeof line, "ROM IMAGES  %d  -  PAGE %d OF %d   (SELECT+R1 / F2: NEXT)", ROM_IMAGE_COUNT, g.page,
+             g.image_pages);
+    centred(t, 8, line, YELLOW);
+    layout_images(g.page - 1, t);
+}
+
 /* Classic: the arcade frame. HD: drawn at the render scale. FILTER: the arcade
    frame upscaled whole. Glow goes over whichever is shown. */
 static void draw(int display_scale)
@@ -137,11 +194,12 @@ static void draw(int display_scale)
     const Scaler scaler = gs->smooth ? SCALER_SMOOTH : SCALER_CRISP;
     const int s = gfx_render_scale(gs, display_scale);
     shown = &fb;
+    void (*scene)(Framebuffer *) = g.page ? draw_images : draw_scene;
     if (gs->mode == GFX_HD && !fb_init(&fb_big, s) && !enhance_prepare(s, scaler)) {
-        draw_scene(&fb_big);
+        scene(&fb_big);
         shown = &fb_big;
     } else {
-        draw_scene(&fb);
+        scene(&fb);
         if (gs->mode == GFX_FILTER && !fb_init(&fb_big, s) && !enhance_filter_frame(&fb, &fb_big, scaler))
             shown = &fb_big;
     }
@@ -155,6 +213,7 @@ static void step(const InputFrame *in)
     g.in = *in;
     if (in->coin && !coin_was) g.coins++;
     coin_was = in->coin;
+    if (in->operator_menu) g.page = g.have_sheet ? (g.page + 1) % (g.image_pages + 1) : 0;
     if (in->gfx_next || in->gfx_glow || in->gfx_scanlines) {
         if (in->gfx_next) gfx_next_preset(&g.gfx);
         if (in->gfx_glow) g.gfx.glow = !g.gfx.glow;
@@ -264,11 +323,16 @@ int main(int argc, char **argv)
     const char *rom_arg = NULL;
     if (argc == 3 && !strcmp(argv[1], "--check-rom")) return check_rom(argv[2]);
     if (argc == 5 && !strcmp(argv[1], "--dump-rom")) return dump_rom(argv[2], argv[3], argv[4]);
+    if (argc == 2 && !strcmp(argv[1], "--list-images")) {
+        for (int i = 0; i < ROM_IMAGE_COUNT; i++) printf("%04X:%d:%d\n", ROM_IMAGES[i].addr, ROM_IMAGES[i].w, ROM_IMAGES[i].h);
+        return 0;
+    }
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--windowed")) windowed = true;
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) max_frames = strtol(argv[++i], NULL, 10);
         else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) screenshot = argv[++i];
         else if (!strcmp(argv[i], "--rom") && i + 1 < argc) rom_arg = argv[++i];
+        else if (!strcmp(argv[i], "--page") && i + 1 < argc) g.page = (int)strtol(argv[++i], NULL, 10);
         else if (!strcmp(argv[i], "--gfx") && i + 1 < argc) {
             if (gfx_parse(argv[++i], &g.gfx)) {
                 fprintf(stderr, "joust: unknown --gfx preset '%s' (one of: %s)\n", argv[i], gfx_preset_names());
@@ -276,10 +340,11 @@ int main(int argc, char **argv)
             }
         } else {
             fprintf(stderr,
-                    "usage: %s [--windowed] [--gfx preset] [--rom path] [--frames N] [--screenshot out.png]\n"
+                    "usage: %s [--windowed] [--gfx preset] [--rom path] [--page N] [--frames N] [--screenshot out.png]\n"
                     "       %s --check-rom <dir|zip>\n"
-                    "       %s --dump-rom <dir|zip> <first> <last>\n",
-                    argv[0], argv[0], argv[0]);
+                    "       %s --dump-rom <dir|zip> <first> <last>\n"
+                    "       %s --list-images\n",
+                    argv[0], argv[0], argv[0], argv[0]);
             return 2;
         }
     }
@@ -292,6 +357,15 @@ int main(int argc, char **argv)
     else rom_locate(argv[0], g.rom_path, sizeof g.rom_path);
     if (g.rom_path[0] && rom_load(&g.rom, g.rom_path, g.rom_error, sizeof g.rom_error))
         fprintf(stderr, "joust: %s\n", g.rom_error);
+    if (g.rom.loaded && !rom_images_decode(&g.rom, &g.sheet)) { /* the image pages */
+        static EnhanceRect rects[MAX_ROM_IMAGES];
+        for (int i = 0; i < ROM_IMAGE_COUNT; i++)
+            rects[i] = (EnhanceRect){ g.sheet.frames[i].x, g.sheet.frames[i].y, g.sheet.frames[i].w, g.sheet.frames[i].h };
+        enhance_add_image(&g.sheet.image, rects, ROM_IMAGE_COUNT, 0);
+        g.have_sheet = 1;
+        g.image_pages = layout_images(-1, NULL);
+    }
+    if (g.page < 0 || g.page > g.image_pages) g.page = 0;
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0) {
         SDL_Log("SDL_Init: %s", SDL_GetError());
@@ -318,6 +392,8 @@ int main(int argc, char **argv)
     input_shutdown();
     video_shutdown();
     SDL_Quit();
+    enhance_clear_images();
+    rom_images_free(&g.sheet);
     fb_free(&fb_big);
     fb_free(&fb);
     return rc;

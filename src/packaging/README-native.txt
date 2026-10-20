@@ -3,7 +3,8 @@ Joust (native SDL2 build) - work in progress
 
 Run ./joust, or joust.exe on Windows (add --windowed for a window on a
 desktop). This early build shows a test card: ROM status, a two-player
-input tester and the graphics presets. The game itself is still to come.
+input tester and the graphics presets, and (Select+R1 / F2) pages of the
+images it decodes from your ROM. The game itself is still to come.
 
 ROM set
   The game needs your own MAME joust ROM set. Put joust.zip (or a joust/

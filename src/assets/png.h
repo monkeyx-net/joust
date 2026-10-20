@@ -1,7 +1,7 @@
 /*
  * Minimal PNG reader/writer, no dependencies.
  *
- * Reads 8-bit RGBA, non-interlaced PNGs (what sprites/ holds); verifies
+ * Reads 8-bit RGB or RGBA, non-interlaced PNGs (MAME snapshots, assets); verifies
  * every chunk CRC and the zlib Adler-32. Writes uncompressed RGBA PNGs
  * (stored deflate blocks), used for framebuffer screenshots in tests.
  */

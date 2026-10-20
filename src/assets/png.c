@@ -56,10 +56,10 @@ int png_decode(const uint8_t *data, size_t size, Image *out, const char **err)
 {
     static const uint8_t sig[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' };
     const char *e = NULL;
-    uint8_t *idat = NULL, *raw = NULL;
+    uint8_t *idat = NULL, *raw = NULL, *rows = NULL;
     size_t idat_len = 0;
     uint32_t w = 0, h = 0;
-    int seen_ihdr = 0, seen_iend = 0;
+    int seen_ihdr = 0, seen_iend = 0, channels = 4;
     memset(out, 0, sizeof *out);
 
     if (size < 8 || memcmp(data, sig, 8) != 0) { e = "not a PNG file"; goto fail; }
@@ -76,7 +76,8 @@ int png_decode(const uint8_t *data, size_t size, Image *out, const char **err)
             if (len != 13) { e = "bad IHDR"; goto fail; }
             w = be32(body);
             h = be32(body + 4);
-            if (body[8] != 8 || body[9] != 6) { e = "only 8-bit RGBA PNGs are supported"; goto fail; }
+            if (body[8] != 8 || (body[9] != 6 && body[9] != 2)) { e = "only 8-bit RGB or RGBA PNGs are supported"; goto fail; }
+            channels = body[9] == 6 ? 4 : 3; /* RGB: MAME snapshots */
             if (body[10] != 0 || body[11] != 0) { e = "unknown compression or filter method"; goto fail; }
             if (body[12] != 0) { e = "interlaced PNGs are not supported"; goto fail; }
             if (w == 0 || h == 0 || w > 16384 || h > 16384) { e = "unreasonable image size"; goto fail; }
@@ -107,20 +108,21 @@ int png_decode(const uint8_t *data, size_t size, Image *out, const char **err)
     if (inflate_raw(idat + 2, idat_len - 6, &raw, &raw_len, &e)) goto fail;
     if (adler32(raw, raw_len) != be32(idat + idat_len - 4)) { e = "zlib Adler-32 mismatch"; goto fail; }
 
-    size_t stride = (size_t)w * 4;
+    const size_t bpp = (size_t)channels, stride = (size_t)w * bpp;
     if (raw_len != (stride + 1) * h) { e = "image data has the wrong size"; goto fail; }
 
-    out->rgba = malloc(stride * h);
-    if (!out->rgba) { e = "out of memory"; goto fail; }
+    out->rgba = malloc((size_t)w * 4 * h);
+    rows = bpp == 4 ? out->rgba : malloc(stride * h);
+    if (!out->rgba || !rows) { e = "out of memory"; goto fail; }
     for (uint32_t y = 0; y < h; y++) {
         const uint8_t *src = raw + y * (stride + 1);
-        uint8_t *dst = out->rgba + y * stride;
+        uint8_t *dst = rows + y * stride;
         const uint8_t *prev = y ? dst - stride : NULL;
         int filter = *src++;
         for (size_t x = 0; x < stride; x++) {
-            int a = x >= 4 ? dst[x - 4] : 0;
+            int a = x >= bpp ? dst[x - bpp] : 0;
             int b = prev ? prev[x] : 0;
-            int c = prev && x >= 4 ? prev[x - 4] : 0;
+            int c = prev && x >= bpp ? prev[x - bpp] : 0;
             int pred;
             switch (filter) {
             case 0: pred = 0; break;
@@ -133,6 +135,14 @@ int png_decode(const uint8_t *data, size_t size, Image *out, const char **err)
             dst[x] = (uint8_t)(src[x] + pred);
         }
     }
+    if (bpp == 3) { /* expand to opaque RGBA */
+        for (size_t i = 0; i < (size_t)w * h; i++) {
+            memcpy(out->rgba + i * 4, rows + i * 3, 3);
+            out->rgba[i * 4 + 3] = 0xFF;
+        }
+        free(rows);
+    }
+    rows = NULL;
     out->width = (int)w;
     out->height = (int)h;
     free(idat);
@@ -142,6 +152,7 @@ int png_decode(const uint8_t *data, size_t size, Image *out, const char **err)
 fail:
     free(idat);
     free(raw);
+    if (rows != out->rgba) free(rows);
     image_free(out);
     if (err) *err = e;
     return -1;

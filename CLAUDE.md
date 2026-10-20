@@ -42,6 +42,8 @@ build/joust --windowed --gfx hd-glow              # enhanced graphics (presets: 
 SDL_VIDEODRIVER=dummy build/joust --frames 60 --screenshot out.png   # headless screenshot
 build/joust --check-rom roms/joust.zip            # verify a ROM set
 build/joust --dump-rom roms/joust.zip D000 D0FF   # main-CPU ROM bytes, "ADDR BYTE" hex
+build/joust --list-images                         # the image catalogue, ADDR:W:H
+build/joust --windowed --page 1                   # the test card's image pages (Select+R1 / F2 steps)
 cmake --build build --target package_linux package_portmaster   # release archives
 cmake -S . -B build-san -DJOUST_SANITIZE=ON       # ASan/UBSan build
 emcmake cmake -S . -B build-web && cmake --build build-web --target serve   # web build on http://localhost:8000/
@@ -60,9 +62,12 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
 - `gfx/` - draws into the framebuffer in arcade coordinates (`fb.scale` > 1 for
   HD): `fb.c`, `blit.c`, `scale.c` (Scale2x/3x, xBR), `enhance.c` (graphics
   presets, HD image registry, whole-frame filter, glow), `debugfont.c` (3x5
-  font for diagnostics, not the ROM's)
+  font for diagnostics, not the ROM's), `williams.c` (video RAM and palette
+  decoding, the SC1 blitter as MAME emulates it)
 - `assets/` - `rom.c` (the joust set from a zip or folder, matched by CRC;
-  CPU address map), `zip.c`, `inflate.c`, `png.c`, `assets.c` (asset folder lookup)
+  CPU address map), `images.c` (the image catalogue: ROM addresses and
+  sizes, decoded through the blitter and the ROM's palette), `zip.c`,
+  `inflate.c`, `png.c` (RGB and RGBA), `assets.c` (asset folder lookup)
 - `sim/` - (to come) pure C game simulation, no SDL, no drawing
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
@@ -87,6 +92,13 @@ Every change keeps `ctest` green.
   in a folder (CRC matching), and fails cleanly on an empty folder
 - `mame_rom_map` - label `mame`: MAME's view of the main CPU's ROM
   ($0000-$8FFF with ROM selected, $D000-$FFFF) equals `joust --dump-rom`
+- `mame_capture` - label `mame`: video RAM and palette dumped from a scripted
+  run, decoded by `gfx/williams.c`, equal MAME's snapshots pixel for pixel
+- `mame_images` - label `mame`: MAME's blitter draws every catalogued image in
+  five modes over a pattern; `gfx/williams.c` must write the same bytes
+- MAME tests share `build/mame` (one at a time) and start each run from a
+  fresh copy of the primed CMOS (`src/tests/mame/mame_common.cmake`); MAME
+  needs `-frameskip 0` for snapshots to show the frame they are taken in
 - Tests that run the game use their own save dir; never write to the user's
   home folder.
 
