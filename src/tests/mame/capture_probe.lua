@@ -4,6 +4,11 @@
 --   PROBE_OUT=<dir> PROBE_FRAMES="600 1500" PROBE_LAST=1800 \
 --   PROBE_SCRIPT="1200:coin 1260:start 1400:right,flap ..." mame joust -autoboot_script capture_probe.lua
 --
+-- PROBE_CYCLE="right,flap:4 right:10 left,flap:4 left:10" repeats inputs
+-- (each held for its frame count) from PROBE_CYCLE_FROM on, after the script.
+-- PROBE_POKE="A052=05" writes RAM every frame from PROBE_POKE_FROM on (a
+-- cheat, e.g. player 1's lives; poking before a game starts upsets the attract mode).
+--
 -- Writes into PROBE_OUT:
 --   blits.txt          one line per blit, hex: frame ctrl solid src dst w h romsel
 --                      (w and h as written to $CA06/$CA07; the SC1 blitter XORs them with 4)
@@ -26,6 +31,18 @@ for n in string.gmatch(os.getenv("PROBE_FRAMES") or "", "%d+") do snap_frames[to
 local script = {}
 for f, what in string.gmatch(os.getenv("PROBE_SCRIPT") or "", "(%d+):([%w,]*)") do
     table.insert(script, { frame = tonumber(f), inputs = what })
+end
+
+local cycle, cycle_len = {}, 0
+for what, n in string.gmatch(os.getenv("PROBE_CYCLE") or "", "([%a,]*):(%d+)") do
+    table.insert(cycle, { inputs = what, frames = tonumber(n) })
+    cycle_len = cycle_len + tonumber(n)
+end
+local cycle_from = tonumber(os.getenv("PROBE_CYCLE_FROM") or "0")
+local poke_from = tonumber(os.getenv("PROBE_POKE_FROM") or "0")
+local pokes = {}
+for a, v in string.gmatch(os.getenv("PROBE_POKE") or "", "(%x+)=(%x+)") do
+    table.insert(pokes, { addr = tonumber(a, 16), value = tonumber(v, 16) })
 end
 
 local fields = {}
@@ -80,8 +97,22 @@ _G.capture_frames = emu.add_machine_frame_notifier(function()
             for what in string.gmatch(s.inputs, "%a+") do held[what] = true end
         end
     end
+    if cycle_len > 0 and frame >= cycle_from then
+        local t = (frame - cycle_from) % cycle_len
+        for _, c in ipairs(cycle) do
+            if t < c.frames then
+                held = {}
+                for what in string.gmatch(c.inputs, "%a+") do held[what] = true end
+                break
+            end
+            t = t - c.frames
+        end
+    end
     for what, name in pairs(NAMES) do
         if fields[name] then fields[name]:set_value(held[what] and 1 or 0) end
+    end
+    if frame >= poke_from then
+        for _, p in ipairs(pokes) do space:write_u8(p.addr, p.value) end
     end
     if snap_frames[frame] then
         dump_frame(frame)

@@ -61,11 +61,25 @@ game's RAM map.
   signed bytes][image header pointer], e.g. the mount frames at $0DF9-$0ECE.
   The collision data is a list of byte pairs per row (P2).
 - The in-game palette is a 16-byte table at $E5FA.
-- `src/assets/images.c` lists the 89 images seen in a 47 s capture (attract,
-  wave 1): platforms, ostrich and buzzard frames, riders and lances, sparks,
-  digits, the font. Not yet seen: pterodactyl, eggs hatching, the troll
-  hand, later-wave enemies. Next: walk the frame-record tables to list every
-  image, then name them.
+- Frame-record tables found so far: $0DF9 (36 records: the ostrich, stork
+  and buzzard mounts), $232A (18), $2F0B (7: eggs, hatching), $34A8 (6:
+  pterodactyl). A scan for more by pattern alone gives mostly noise.
+- Drawing: the IRQ handler ($E460-$E4B1) walks a display list in RAM; each
+  node is [ctrl][solid][src hi][src lo][dst hi][dst lo][w][h][next], copied
+  to the blitter with `LDS #$CA08; PULU CC,D,DP,X,Y; PSHS Y,X,DP,D,CC` (the
+  push order lands the bytes on $CA00-$CA07, $CA00 last). Text goes through
+  $4A70-$4B2F (font tables at $4B5C and $4BC6), digits through $E7D4.
+- RAM: player 1's lives are kept in $A051 and $A052 (both counted down per
+  death; poking both every frame gives unlimited lives for captures).
+- `src/assets/images.c` lists 166 images from the attract mode, a 30-minute
+  capture with unlimited lives and the frame-record tables: platforms and
+  bridge pieces, the ostrich (P1) and stork (P2) in every frame, buzzards,
+  riders and lances in each colour, eggs and hatching knights, the troll's
+  hand and the lava flames, the pterodactyl, digits, two fonts. Not yet
+  seen: whatever only later waves draw (the unlimited-lives run stays on
+  the early layout). Next: name the images from the tables, then P2.
+- `src/tests/mame/dasm_probe.lua` writes MAME's disassembly to `build/re`
+  for reading the code (never commit its output).
 
 ## 3. Test plan
 
@@ -88,7 +102,7 @@ game's RAM map.
 | Phase | Work | Exit criterion |
 |---|---|---|
 | P0 | Repo, ROM set loader (CRC matching, zip or folder), MAME pipeline, platform layer, test card, packaging, CI (done 2026-10-20) | `enhance`, `rom_load`, `mame_rom_map` pass |
-| P1 | (in progress: video and palette decoding, blitter emulation and 89 captured images done, 2026-10-20) Graphics from the ROM: find the image tables (ostriches, buzzards, knights, pterodactyl, eggs, platforms, lava, troll hand, font) and the palette; extractor writes `assets/` at first run | Extracted frames drawn by the port match MAME screenshots of the same scenes |
+| P1 | (in progress: video and palette decoding, blitter emulation, 166 images found and checked against MAME, 2026-10-20) Graphics from the ROM: find the image tables (ostriches, buzzards, knights, pterodactyl, eggs, platforms, lava, troll hand, font) and the palette; extractor writes `assets/` at first run | Extracted frames drawn by the port match MAME screenshots of the same scenes |
 | P2 | Reverse engineering: RAM map, object lists, PRNG, flap and gravity physics, collisions and joust outcome, wave tables and spawn rules | Lua probes dump each documented variable; notes in this plan |
 | P3 | Sim, wave 1: player, Bounders, eggs and hatching, platforms, scoring, death and respawn, deterministic from scripted input | Per-frame traces equal MAME's for scripted wave-1 games |
 | P4 | Full game: all wave types (egg, survival, gladiator, pterodactyl), Hunters and Shadow Lords, troll hand, lava, crumbling platforms, extra lives, 2 players | Traces match MAME through wave 10 |

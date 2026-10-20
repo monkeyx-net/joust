@@ -96,6 +96,11 @@ Every change keeps `ctest` green.
   run, decoded by `gfx/williams.c`, equal MAME's snapshots pixel for pixel
 - `mame_images` - label `mame`: MAME's blitter draws every catalogued image in
   five modes over a pattern; `gfx/williams.c` must write the same bytes
+- Probes that are not tests: `ram_probe.lua` (work RAM at chosen frames, with
+  scripted input and cheat pokes) and `dasm_probe.lua` (MAME's disassembly to
+  `build/re`; never commit it). `capture_probe.lua` also takes `PROBE_CYCLE`
+  (repeating input) and `PROBE_POKE` / `PROBE_POKE_FROM` (e.g. `A051=05
+  A052=05` for unlimited lives once a game runs).
 - MAME tests share `build/mame` (one at a time) and start each run from a
   fresh copy of the primed CMOS (`src/tests/mame/mame_common.cmake`); MAME
   needs `-frameskip 0` for snapshots to show the frame they are taken in
