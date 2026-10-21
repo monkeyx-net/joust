@@ -93,7 +93,8 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   type), `prng.c` (the random generator, $E4C0, and the IRQ's stir),
   `checksum.c` (the ROM check task, $ECF8), `lava.c` (the lava's surface
   and bubbles, $E4E6), `collide.c` (the collision walks $837F/$83A4, the
-  pair test $83D8 and the data test $DC21; a collision's handlers not yet);
+  pair test $83D8 and the data test $DC21; a collision's handlers not yet),
+  `scores.c` (the score digits, $E785; blitted with `game_blit`);
   each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata

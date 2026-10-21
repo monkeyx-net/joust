@@ -45,6 +45,11 @@ void game_set_word(Game *g, uint16_t addr, uint16_t value);
 /* `STA $BFFF; STA $C900`: the ROM select and its copy in RAM. */
 void game_select_rom(Game *g, uint8_t value);
 
+/* A blit as a write to $CA00 starts it (registers as the game writes them,
+   w_reg and h_reg before the XOR 4), on the C game's RAM: gfx/williams.c's
+   blitter, which the board's is too. Each byte goes through on_write. */
+void game_blit(Game *g, uint8_t ctrl, uint8_t solid, uint16_t src, uint16_t dst, uint8_t w_reg, uint8_t h_reg);
+
 /* $E4C0 (through $E018): the random generator's step on <$0D-<$0E (sim/prng.h).
    Returns A; *carry (if not NULL) gets the carry the callers use. */
 uint8_t game_random(Game *g, int *carry);

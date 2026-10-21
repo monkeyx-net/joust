@@ -2,10 +2,13 @@
 
 #include <string.h>
 
+#include "gfx/williams.h"
+
 #include "sim/checksum.h"
 #include "sim/collide.h"
 #include "sim/lava.h"
 #include "sim/prng.h"
+#include "sim/scores.h"
 #include "sim/tasks.h"
 
 #define RNG 0xA00D          /* <$0D-<$0E */
@@ -58,6 +61,19 @@ void game_select_rom(Game *g, uint8_t value)
     g->romsel = value;
 }
 
+static void blit_wrote(void *ctx, unsigned addr, uint8_t value)
+{
+    Game *g = ctx;
+    (void)value;
+    if (g->on_write) g->on_write(g->user, (uint16_t)addr);
+}
+
+void game_blit(Game *g, uint8_t ctrl, uint8_t solid, uint16_t src, uint16_t dst, uint8_t w_reg, uint8_t h_reg)
+{
+    WilliamsBus bus = { g->ram, NULL, g->romsel & 1, blit_wrote, g, g->rom };
+    williams_blit(&bus, ctrl, solid, src, dst, w_reg, h_reg);
+}
+
 uint8_t game_random(Game *g, int *carry)
 {
     Prng p = { g->ram[RNG], g->ram[RNG + 1] };
@@ -80,7 +96,7 @@ void game_sound(Game *g, uint16_t script)
 int game_step_ported(const Game *g, uint16_t task)
 {
     uint16_t at = game_word(g, (uint16_t)(task + TASK_RESUME));
-    return checksum_ported(at) || lava_ported(at) || collide_ported(at);
+    return checksum_ported(at) || lava_ported(at) || collide_ported(at) || scores_ported(at);
 }
 
 StepResult game_step(Game *g, uint16_t task)
@@ -89,5 +105,6 @@ StepResult game_step(Game *g, uint16_t task)
     if (checksum_ported(at)) return checksum_step(g, task, at);
     if (lava_ported(at)) return lava_step(g, task, at);
     if (collide_ported(at)) return collide_step(g, task, at);
+    if (scores_ported(at)) return scores_step(g, task, at);
     return STEP_UNPORTED;
 }

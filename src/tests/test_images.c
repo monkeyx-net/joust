@@ -60,7 +60,7 @@ int main(int argc, char **argv)
         memset(ram, 0, sizeof ram);
         for (int c = 0; c < cols; c++)
             for (int y = 0; y < im->h; y++) ram[c * 256 + y] = PATTERN;
-        WilliamsBus bus = { ram, &rom, 1, NULL, NULL };
+        WilliamsBus bus = { ram, &rom, 1, NULL, NULL, NULL };
         williams_blit(&bus, (uint8_t)ctrl, SOLID, (uint16_t)addr, 0x0000, (uint8_t)(im->w ^ 4), (uint8_t)(im->h ^ 4));
         const char *p = line + off;
         int diffs = 0;

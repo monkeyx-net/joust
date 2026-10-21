@@ -38,6 +38,8 @@ typedef struct {
     /* optional: told of each byte the blitter writes, before it lands (tests) */
     void (*on_write)(void *ctx, unsigned addr, uint8_t value);
     void *ctx;
+    /* optional: program ROM by address, read instead of `rom` (the C game's) */
+    const uint8_t *rom_image;
 } WilliamsBus;
 
 /* One blit as a write to $CA00 starts it: registers as the game writes them

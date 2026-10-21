@@ -49,6 +49,7 @@ add_library(joust_core STATIC
   src/sim/checksum.c
   src/sim/lava.c
   src/sim/collide.c
+  src/sim/scores.c
   src/emu/m6809.c
   src/emu/pia6821.c
   src/emu/board.c

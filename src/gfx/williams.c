@@ -37,12 +37,17 @@ void williams_draw_vram(Framebuffer *fb, const uint8_t *vram, const uint8_t pale
         }
 }
 
+static uint8_t rom_at(const WilliamsBus *bus, unsigned addr)
+{
+    return bus->rom_image ? bus->rom_image[addr] : (uint8_t)rom_byte(bus->rom, addr);
+}
+
 static uint8_t bus_read(const WilliamsBus *bus, unsigned addr)
 {
     addr &= 0xFFFF;
-    if (addr < 0x9000 && bus->romsel) return (uint8_t)rom_byte(bus->rom, addr);
+    if (addr < 0x9000 && bus->romsel) return rom_at(bus, addr);
     if (addr < WILLIAMS_VRAM_SIZE) return bus->ram[addr];
-    if (addr >= 0xD000) return (uint8_t)rom_byte(bus->rom, addr);
+    if (addr >= 0xD000) return rom_at(bus, addr);
     return 0; /* I/O and the rest: not image sources */
 }
 

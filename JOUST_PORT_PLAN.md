@@ -209,12 +209,21 @@ named; `game` checks each (section 3).
   (overflow on `SUBD`) and returns a collision in the carry. A collision
   goes on to the handlers at $8418 (who wins, eggs, bounces): not ported,
   so a step meeting one is a path not ported (8 in the scripted game).
+- **Scores** ($E785-$E80C, `sim/scores.c`): a task per score, +D its
+  table in ROM ($E71D for player 1's): +0 the change flag ($A050), +2 the
+  colours (the second blit's control and solid), then 6-byte entries from
+  +4: the BCD byte ($A04C-$A04F), the screen address, the digit routine
+  ($E7D4 high nibble, $E7D8 low); a negative address ends them. On a
+  change ($E7A6, every 2 frames) the flag is cleared and the digits drawn
+  from the first that is not a leading zero, one a frame ($E79B): a solid
+  $EE blit over the 3 x 7 cell (control $12), then the glyph from
+  [[$4A68]] + 2 + digit x $17 in the score's colour, interrupts masked.
+  The C game blits on its own RAM (`game_blit`: gfx/williams.c's blitter,
+  reading the ROM image).
 - The scripted game (`game`) runs 79 task addresses; ported so far: the
-  ROM check, the lava and the collision walks (14549 of 32206 steps). The
-  most frequent left: $8F3D and $8F04 (a rider's step: the controls at
-  $D83D, then `[$30,U]`, $8E05, $D9A3), $65AE, $E7A6 (the scores: a
-  table of digits drawn by `JSR [4,X]`, $E7D4 blitting from the task, so
-  the C game needs the blitter on its RAM), $6364, $8D4D.
+  ROM check, the lava, the collision walks and the scores (16863 of 32206
+  steps). The most frequent left: $8F3D and $8F04 (a rider's step: the
+  controls at $D83D, then `[$30,U]`, $8E05, $D9A3), $65AE, $6364, $8D4D.
 
 ## 3. Test plan
 
