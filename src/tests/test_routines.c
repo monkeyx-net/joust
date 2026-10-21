@@ -12,6 +12,9 @@
  *     the carry must match
  *   - $83D8, a pair's box and data test: random task blocks; it returns
  *     (apart) or goes on to the handlers at $8418 (a collision)
+ *   - the display list's nodes ($E2A1, $E2B8, $E2CF, $E2F9, $E322, $E358,
+ *     sim/display.c): random chain tails, free pointer and objects; the
+ *     node returned (X) and all of RAM must match
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +23,7 @@
 #include "assets/rom.h"
 #include "emu/board.h"
 #include "sim/collide.h"
+#include "sim/display.h"
 #include "sim/game.h"
 
 #define CASES 20000
@@ -160,6 +164,37 @@ static void pair_cases(void)
     printf("test_routines: $83D8: %d cases, %ld colliding\n", CASES, hits);
 }
 
+static void display_cases(void)
+{
+    static const struct { uint16_t pc; int chain, nodes; } entries[] = {
+        { 0xE2A1, 0, 0 }, { 0xE2B8, 1, 0 }, { 0xE2CF, 0, 1 }, { 0xE2F9, 1, 1 }, { 0xE322, 0, 2 }, { 0xE358, 1, 2 },
+    };
+    for (int i = 0; i < CASES; i++) {
+        int e = i % 6;
+        for (int band = 0; band < 4; band++) /* each chain's tail: a next field in the lists' area */
+            for (int c = 0; c < 2; c++) poke_word((uint16_t)(0xA004 + c * 2 + band * 0x40), (uint16_t)(0xA9C0 + rnd() % 0x500));
+        poke_word(0xA02A, (uint16_t)(0xA9C0 + rnd() % 0x500));
+        for (int k = 0; k < 0x38; k++) board.ram[TASK_U + k] = (uint8_t)rnd();
+        uint8_t line = (uint8_t)rnd();
+        sync_model();
+        board.cpu.u = TASK_U;
+        board.cpu.b = line;
+        if (call(entries[e].pc, 0) != RETURN) {
+            if (failures++ < 8) fprintf(stderr, "test_routines: $%04X case %d did not return\n", entries[e].pc, i);
+            continue;
+        }
+        uint16_t node = entries[e].nodes ? display_object(&model, TASK_U, entries[e].chain, entries[e].nodes)
+                                         : display_node(&model, entries[e].chain, line);
+        long d = first_difference();
+        if (node != board.cpu.x && failures++ < 8)
+            fprintf(stderr, "test_routines: $%04X case %d: X %04X, C %04X\n", entries[e].pc, i, board.cpu.x, node);
+        else if (d >= 0 && failures++ < 8)
+            fprintf(stderr, "test_routines: $%04X case %d: $%04lX = %02X, C %02X\n", entries[e].pc, i, d,
+                    board.ram[d], model.ram[d]);
+    }
+    printf("test_routines: display list nodes: %d cases over the 6 entries\n", CASES);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -181,6 +216,7 @@ int main(int argc, char **argv)
     board.cpu.dp = 0xA0; /* direct page: the game's globals */
     rows_cases();
     pair_cases();
+    display_cases();
     if (failures) {
         fprintf(stderr, "test_routines: %d differences\n", failures);
         return 1;
