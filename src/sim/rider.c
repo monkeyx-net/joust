@@ -1,6 +1,7 @@
 #include "sim/rider.h"
 
 #include "sim/display.h"
+#include "sim/platform.h"
 #include "sim/tasks.h"
 
 #define CONTROLS 0xA032 /* <$32: the direction (-1, 0, 1), <$33 the flap */
@@ -163,20 +164,11 @@ void rider_frame(Game *g, uint16_t u, uint8_t frame)
     }
 }
 
-/* $D9A3: anything under the rider? 1 none (keep flying), 0 or -1 a platform (paths not ported) */
-static int below(Game *g, uint16_t u)
-{
-    uint16_t x = game_word(g, field(u, 7)), y = game_word(g, field(u, 0xA));
-    if (game_read(g, (uint16_t)(x - 0x4FFE)) & game_read(g, (uint16_t)(y - 0x1569))) return -1; /* $D9C2 */
-    if (game_read(g, (uint16_t)(x - 0x515E)) & game_read(g, (uint16_t)(y - 0x17C9))) return -1; /* $DA3E */
-    return 1;
-}
-
 /* the frame, the platforms, then the pictures and a sleep; or a landing */
 static StepResult air_end(Game *g, uint16_t u, uint8_t frame, uint16_t resume)
 {
     rider_frame(g, u, frame);
-    if (below(g, u) <= 0) return STEP_UNPORTED; /* $8F87 */
+    if (platform_below(g, u) <= 0) return STEP_UNPORTED; /* $8F87: landing */
     pictures(g, u, 1);
     return task_sleep(g, game_read(g, game_read_word(g, (uint16_t)(game_word(g, field(u, 0xD)) + 0x1A))), resume);
 }

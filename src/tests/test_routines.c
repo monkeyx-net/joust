@@ -9,12 +9,17 @@
  * the edges. TRACE=1 runs two cases of each, printing the ROM's path.
  *   - $DC21, the collision data test (sim/collide.c): random row lists
  *     (well formed, and noise for the overflow paths), random offsets;
- *     the carry must match
+ *     the carry and where X and Y end must match
  *   - $83D8, a pair's box and data test: random task blocks; it returns
  *     (apart) or goes on to the handlers at $8418 (a collision)
  *   - the display list's nodes ($E2A1, $E2B8, $E2CF, $E2F9, $E322, $E358,
  *     sim/display.c): random chain tails, free pointer and objects; the
  *     node returned (X) and all of RAM must match
+ *   - $D9A3, the platforms around a rider (sim/platform.c), on RAM from a
+ *     game in progress (the scripted game's frame 2000, for the wave's
+ *     platform maps), the player's block at random x, line, velocity,
+ *     speed and push: landing or flying (the Z flag) and all of RAM; the
+ *     cases that start the troll's hand ($DA0E) are skipped
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,6 +30,7 @@
 #include "sim/collide.h"
 #include "sim/display.h"
 #include "sim/game.h"
+#include "sim/platform.h"
 
 #define CASES 20000
 #define RETURN 0x0000      /* where the call returns: stepping stops there */
@@ -110,10 +116,12 @@ static void rows_cases(void)
             if (failures++ < 8) fprintf(stderr, "test_routines: $DC21 case %d did not return\n", i);
             continue;
         }
-        int rom_carry = board.cpu.cc & 1, c = collide_rows(&model, LIST_X, LIST_Y, dx);
+        uint16_t x = LIST_X, y = LIST_Y;
+        int rom_carry = board.cpu.cc & 1, c = collide_rows_at(&model, &x, &y, dx);
         hits += rom_carry;
-        if (rom_carry != c && failures++ < 8)
-            fprintf(stderr, "test_routines: $DC21 case %d: ROM %d, C %d\n", i, rom_carry, c);
+        if ((rom_carry != c || x != board.cpu.x || y != board.cpu.y) && failures++ < 8)
+            fprintf(stderr, "test_routines: $DC21 case %d: ROM %d X %04X Y %04X, C %d X %04X Y %04X\n", i, rom_carry,
+                    board.cpu.x, board.cpu.y, c, x, y);
     }
     printf("test_routines: $DC21: %d cases, %ld overlapping\n", CASES, hits);
 }
@@ -195,6 +203,66 @@ static void display_cases(void)
     printf("test_routines: display list nodes: %d cases over the 6 entries\n", CASES);
 }
 
+static void platform_cases(void)
+{
+    /* a game in progress */
+    static uint8_t cmos[BOARD_CMOS_SIZE];
+    board_init(&board, &rom, NULL);
+    for (int i = 0; i < 1800; i++) board_run_frame(&board, NULL);
+    memcpy(cmos, board.cmos, sizeof cmos);
+    board_init(&board, &rom, cmos);
+    for (long f = 1; f <= 2000; f++) {
+        board.in2 = f >= 1200 && f < 1215 ? IN2_COIN1 : 0;
+        board.in0 = f >= 1300 && f < 1315 ? IN0_START1 : 0;
+        board.inp1 = f > 1400 ? (uint8_t)(f % 90 < 40 ? INP_RIGHT : 0) : 0;
+        board_run_frame(&board, NULL);
+    }
+    static uint8_t base[0xC000];
+    memcpy(base, board.ram, sizeof base);
+    uint16_t player = 0;
+    for (uint16_t t = (uint16_t)(base[0xA00A] << 8 | base[0xA00B]); t; t = (uint16_t)(base[t] << 8 | base[t + 1]))
+        if (base[t + 2] == 0x89) player = t;
+    if (!player) {
+        if (failures++ < 8) fprintf(stderr, "test_routines: no player in the game at frame 2000\n");
+        return;
+    }
+    long lands = 0, bounces = 0, skipped = 0;
+    for (int i = 0; i < CASES; i++) {
+        memcpy(board.ram, base, sizeof base);
+        poke_word((uint16_t)(player + 7), (uint16_t)((int)(rnd() % 0x130) - 10));
+        board.ram[player + 0xA] = 0;
+        board.ram[player + 0xB] = (uint8_t)(0x20 + rnd() % 0xC8);
+        poke_word((uint16_t)(player + 0x11), (uint16_t)((int)(rnd() % 0x400) - 0x200));
+        board.ram[player + 0x14] = (uint8_t)(((int)(rnd() % 9) - 4) * 2);
+        board.ram[player + 0x22] = (uint8_t)((int)(rnd() % 13) - 6);
+        board.ram[player + 0x23] = 0;
+        board.ram[0xA04B] = 0;
+        sync_model();
+        board.cpu.u = player;
+        uint16_t end = call(0xD9A3, 0xDA0E);
+        if (end == 0xDA0E) {
+            skipped++;
+            continue;
+        }
+        if (end != RETURN) {
+            if (failures++ < 8) fprintf(stderr, "test_routines: $D9A3 case %d did not return\n", i);
+            continue;
+        }
+        int rom = board.cpu.cc & 0x04 ? 0 : 1, c = platform_below(&model, player);
+        lands += !rom;
+        bounces += board.ram[player + 0x23] != 0;
+        if (rom != c) {
+            if (failures++ < 8) fprintf(stderr, "test_routines: $D9A3 case %d: ROM %d, C %d\n", i, rom, c);
+            continue;
+        }
+        long d = first_difference();
+        if (d >= 0 && failures++ < 8)
+            fprintf(stderr, "test_routines: $D9A3 case %d: $%04lX = %02X, C %02X\n", i, d, board.ram[d], model.ram[d]);
+    }
+    printf("test_routines: $D9A3: %d cases, %ld landing, %ld bounced, %ld at the troll's hand skipped\n", CASES, lands,
+           bounces, skipped);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -217,6 +285,7 @@ int main(int argc, char **argv)
     rows_cases();
     pair_cases();
     display_cases();
+    platform_cases();
     if (failures) {
         fprintf(stderr, "test_routines: %d differences\n", failures);
         return 1;

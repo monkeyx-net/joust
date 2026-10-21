@@ -264,10 +264,23 @@ named; `game` checks each (section 3).
   of [[+D]+$1A] frames. Ported for the players in the air; landing
   ($8F87), the lava ($D899), $D9C2's platform classes, $DA3E and the
   enemies' brains not yet.
+- **Platforms** ($D9A3-$DC20, `sim/platform.c`): a platform's top under a
+  rider ($B002 + x against $EA97 + line) lands it ($D9C2: its line set to
+  $44, $50, $80, $89, $A2 or $D2 by the bits; the lava's line, $D9FC, is
+  where the troll's hand may start, not ported); one beside or above it
+  ($AEA2 + x against $E837 + line, $DA3E) is tested with the platform's
+  collision data ([[$0000]]-[[$000E]] by the bits) through $DBF9 (<$34 the
+  x difference from the given column, the lists offset by the lines
+  between the rider's bottom and the given line, then $DC21, whose end
+  rows are then looked at): from above (velocity complemented and halved,
+  +$23 $FE, +$14 set to ±2 if it was 0), from below (a rising velocity
+  reversed and halved, +$23 2), or off a side (+$14 turned, the push +$22
+  of ∓6 more, the velocity at most $FFC0 up); each with the sound at
+  $EF8F; <$4B collects the bits met.
 - The scripted game (`game`) runs 79 task addresses; ported so far: the
   ROM check, the lava, the collision walks, the scores, the flow's
-  frequent paths and the players in the air (26478 of 32206 steps run in
-  ported tasks, 21589 all the way in C). The most frequent left: the
+  frequent paths and the players in the air with the platforms' bounces
+  (26478 of 32206 steps run in ported tasks, 21989 all the way in C). The most frequent left: the
   enemies' brains ($8F3D/$8F04 with types $8F), $65AE (<$4B's bits,
   drawing through $65EE), $8D4D (on the ground), $6D91, $7619.
 
@@ -298,7 +311,9 @@ named; `game` checks each (section 3).
   random row lists, well formed and noise: 5384 overlap) and $83D8 (20000
   random pairs of task blocks: 1024 collide, where the ROM goes on to
   $8418), the display list's six node entries (20000 random chains, free
-  pointers and objects: the node returned and all of RAM).
+  pointers and objects: the node returned and all of RAM), $D9A3 on a
+  game in progress with the player at random x, line, velocity, speed and
+  push (20000: 2192 land, 2236 bounce; $DC21's end rows checked too).
 - **MAME** (label `mame`): `mame_rom_map`, `mame_capture` (video RAM and
   palette decoding against MAME snapshots), `mame_images` (the blitter
   against MAME's, per image and mode); later per-frame RAM traces of

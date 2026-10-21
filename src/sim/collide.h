@@ -21,6 +21,9 @@ StepResult collide_step(Game *g, uint16_t task, uint16_t at);
 /* $DC21: do the collision data at x and y (row spans) overlap, x's
    shifted by `dx`? The carry the ROM returns. */
 int collide_rows(const Game *g, uint16_t x, uint16_t y, uint16_t dx);
+/* The same, leaving *px and *py where the ROM's X and Y end (the row that
+   overlapped, which the platforms' handlers look at). */
+int collide_rows_at(const Game *g, uint16_t *px, uint16_t *py, uint16_t dx);
 /* $83D8: the boxes and data of tasks u and x (writes <$49 and <$34): 0
    apart, -1 a collision (where the ROM goes on to its handlers). */
 int collide_pair(Game *g, uint16_t u, uint16_t x);

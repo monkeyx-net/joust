@@ -40,11 +40,21 @@ static void subd(Acc *r, uint16_t m)
 static int lt(const Acc *r) { return r->n != r->v; }
 static int gt(const Acc *r) { return !r->z && r->n == r->v; }
 
-int collide_rows(const Game *g, uint16_t x, uint16_t y, uint16_t dx)
+int collide_rows_at(const Game *g, uint16_t *px, uint16_t *py, uint16_t dx)
 {
     Acc r;
     uint8_t a;
+    uint16_t x = *px, y = *py;
+    int hit = 0;
 #define W(addr) game_read_word(g, (uint16_t)(addr))
+#define HIT(n)                       \
+    do {                             \
+        x = (uint16_t)(x + (n));     \
+        y = (uint16_t)(y + (n));     \
+        hit = 1;                     \
+        goto done;                   \
+    } while (0)
+#define MISS goto done
 dc21:
     ldd(&r, W(x + 2));
     if (lt(&r)) {
@@ -62,10 +72,10 @@ dc21:
     subd(&r, W(y + 2));
     subd(&r, dx);
     if (gt(&r)) goto dc97;
-    return 1;
+    HIT(0);
 dc18:
     a |= game_read(g, y);
-    if (a & 1) return 0; /* RORA; BCS: the lists' end */
+    if (a & 1) MISS; /* RORA; BCS: the lists' end */
     x = (uint16_t)(x + 4);
     y = (uint16_t)(y + 4);
     goto dc21;
@@ -73,62 +83,70 @@ dc37:
     x = (uint16_t)(x + 16);
     y = (uint16_t)(y + 16);
     ldd(&r, W(x + 2));
-    if (lt(&r)) return 0;
+    if (lt(&r)) MISS;
     subd(&r, W(y));
-    if (r.v) return 0;
+    if (r.v) MISS;
     subd(&r, dx);
-    if (!lt(&r)) return 1;
+    if (!lt(&r)) HIT(0);
 dc4b:
     ldd(&r, W(x + 6));
-    if (lt(&r)) return 0;
+    if (lt(&r)) MISS;
     subd(&r, W(y + 4));
-    if (r.v) return 0;
+    if (r.v) MISS;
     subd(&r, dx);
-    if (!lt(&r)) return 1;
+    if (!lt(&r)) HIT(4);
     ldd(&r, W(x + 0xA));
-    if (lt(&r)) return 0;
+    if (lt(&r)) MISS;
     subd(&r, W(y + 8));
-    if (r.v) return 0;
+    if (r.v) MISS;
     subd(&r, dx);
-    if (!lt(&r)) return 1;
+    if (!lt(&r)) HIT(8);
     ldd(&r, W(x + 0xE));
-    if (lt(&r)) return 0;
+    if (lt(&r)) MISS;
     subd(&r, W(y + 0xC));
-    if (r.v) return 0;
+    if (r.v) MISS;
     subd(&r, dx);
     if (lt(&r)) goto dc37;
-    return 1;
+    HIT(0xC);
 dc83:
     x = (uint16_t)(x + 16);
     y = (uint16_t)(y + 16);
     ldd(&r, W(x));
-    if (lt(&r)) return 0;
+    if (lt(&r)) MISS;
     subd(&r, W(y + 2));
-    if (r.v) return 0;
+    if (r.v) MISS;
     subd(&r, dx);
-    if (!gt(&r)) return 1;
+    if (!gt(&r)) HIT(0);
 dc97:
     ldd(&r, W(x + 4));
-    if (lt(&r)) return 0;
+    if (lt(&r)) MISS;
     subd(&r, W(y + 6));
-    if (r.v) return 0;
+    if (r.v) MISS;
     subd(&r, dx);
-    if (!gt(&r)) return 1;
+    if (!gt(&r)) HIT(4);
     ldd(&r, W(x + 8));
-    if (lt(&r)) return 0;
+    if (lt(&r)) MISS;
     subd(&r, W(y + 0xA));
-    if (r.v) return 0;
+    if (r.v) MISS;
     subd(&r, dx);
-    if (!gt(&r)) return 1;
+    if (!gt(&r)) HIT(8);
     ldd(&r, W(x + 0xC));
-    if (lt(&r)) return 0;
+    if (lt(&r)) MISS;
     subd(&r, W(y + 0xE));
-    if (r.v) return 0;
+    if (r.v) MISS;
     subd(&r, dx);
     if (gt(&r)) goto dc83;
-    return 1;
+    HIT(0xC);
+done:
+    *px = x;
+    *py = y;
+    return hit;
+#undef HIT
+#undef MISS
 #undef W
 }
+
+int collide_rows(const Game *g, uint16_t x, uint16_t y, uint16_t dx) { return collide_rows_at(g, &x, &y, dx); }
 
 /* $83D8: 0 apart, -1 a collision (the handlers: not ported) */
 int collide_pair(Game *g, uint16_t u, uint16_t x)

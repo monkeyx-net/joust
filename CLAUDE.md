@@ -100,7 +100,7 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   its multiplexer (`game_controls`, $6BA6), `display.c` (the display
   list's nodes, $E2A1-$E38C), `rider.c` (the riders: the players' steps
   in the air, $8F04/$8F3D, with their controls, flap, motion, frame and
-  nodes);
+  nodes), `platform.c` (landing on a platform, bouncing off one, $D9A3);
   each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
@@ -151,8 +151,8 @@ Every change keeps `ctest` green.
   check a new port by planting a bug: the test must catch it.
 - `routines` - label `rom`: ROM routines run on the emulated CPU (direct page
   $A0, interrupts masked) from chosen RAM and registers until they return,
-  against the C ones on the same RAM: $DC21 and $83D8 on 20000 random cases
-  each. Use it where scripted play rarely reaches a path; aim cases at the
+  against the C ones on the same RAM: $DC21, $83D8, the display list's
+  nodes and $D9A3 (on a game in progress) on 20000 random cases each. Use it where scripted play rarely reaches a path; aim cases at the
   edges. `TRACE=1` prints the ROM's path for the first cases.
 - `mame_emu` - label `mame`: the emulated board from power-on with the primed
   CMOS and the probes' script: all 20000 random-state changes in MAME's order
