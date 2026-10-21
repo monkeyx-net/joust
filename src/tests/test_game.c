@@ -62,8 +62,9 @@ static int irq_depth;
 
 /* ---- the step being followed ---------------------------------------------- */
 
-static uint16_t step_task;
-static uint8_t predicted[GAME_RAM], has_prediction[GAME_RAM], written[GAME_RAM], predicted_romsel;
+static uint16_t step_task, step_at;
+static uint8_t predicted[GAME_RAM], has_prediction[GAME_RAM], written[GAME_RAM], predicted_romsel, predicted_crb;
+static int predicted_mux;
 static int step_active, step_interrupted;
 static long steps, steps_unported, steps_matched, steps_reordered, steps_raced, frame_checks;
 static struct { uint16_t at; long n, ported; } by_resume[128];
@@ -71,9 +72,15 @@ static struct { uint16_t at; long n, ported; } by_resume[128];
 static void load_model(void)
 {
     game_load(&model, board.ram, board.romsel);
+    model.in0 = board.in0;
+    model.inp1 = board.inp1;
+    model.inp2 = board.inp2;
+    model.pia0_crb = board.pia[0].b.cr;
+    model.mux = board.mux_select;
 }
 
-/* The first address where `m` differs from RAM, or -1 (-2: the ROM select). */
+/* The first address where `m` differs from RAM, or -1 (-2: the ROM select
+   or PIA 0's control register B). */
 static long first_difference_of(const Game *m)
 {
     if (memcmp(m->ram, board.ram, STACK_FROM))
@@ -82,7 +89,8 @@ static long first_difference_of(const Game *m)
     if (memcmp(m->ram + STACK_TO, board.ram + STACK_TO, GAME_RAM - STACK_TO))
         for (unsigned a = STACK_TO; a < GAME_RAM; a++)
             if (m->ram[a] != board.ram[a]) return a;
-    if ((m->romsel & 1) != (board.romsel & 1)) return -2;
+    if ((m->romsel & 1) != (board.romsel & 1) || m->pia0_crb != board.pia[0].b.cr || m->mux != board.mux_select)
+        return -2;
     return -1;
 }
 
@@ -90,11 +98,16 @@ static void report(long a, const char *what)
 {
     if (failures++ >= 8) return;
     if (a == -2)
-        fprintf(stderr, "test_game: frame %lld: %s: ROM select %d, C %d\n", (long long)board.frame, what,
-                board.romsel & 1, model.romsel & 1);
+        fprintf(stderr, "test_game: frame %lld: %s (task $%04X): ROM select %d, C %d; $C807 %02X, C %02X\n",
+                (long long)board.frame, what, step_task, board.romsel & 1, model.romsel & 1, board.pia[0].b.cr,
+                model.pia0_crb);
     else
-        fprintf(stderr, "test_game: frame %lld: %s (task $%04X): $%04lX = %02X, C %02X\n", (long long)board.frame,
-                what, step_task, a, board.ram[a], model.ram[a]);
+        fprintf(stderr, "test_game: frame %lld: %s (task $%04X at $%04X): $%04lX = %02X, C %02X\n",
+                (long long)board.frame, what, step_task, step_at, a, board.ram[a], model.ram[a]);
+    if (getenv("DBG"))
+        for (unsigned d = 0; d < GAME_RAM; d++)
+            if (!stack(d) && model.ram[d] != board.ram[d])
+                fprintf(stderr, "  $%04X ram %02X model %02X\n", d, board.ram[d], model.ram[d]);
 }
 
 static void apply_irq_writes(Game *m)
@@ -114,6 +127,8 @@ static int merged_matches(void)
         if (step_seq[a] && step_seq[a] > irq_seq[a]) merged.ram[a] = other.ram[a];
     }
     merged.romsel = other.romsel;
+    merged.pia0_crb = other.pia0_crb;
+    merged.mux = other.mux;
     return first_difference_of(&merged) == -1;
 }
 
@@ -189,7 +204,11 @@ static void start_step(uint16_t task)
     count_resume(at, ported);
     if (!ported) return;
     step_task = task;
+    step_at = at;
     steps++;
+    model.in0 = board.in0; /* the controls change between frames: as the PIA shows them now */
+    model.inp1 = board.inp1;
+    model.inp2 = board.inp2;
     before = model;
     irq_count = irq_n = 0;
     step_writes = 0;
@@ -209,6 +228,8 @@ static void start_step(uint16_t task)
             predicted[a] = scratch.ram[a];
         }
     predicted_romsel = scratch.romsel;
+    predicted_crb = scratch.pia0_crb;
+    predicted_mux = scratch.mux;
     step_active = 1;
     step_interrupted = 0;
 }
@@ -217,6 +238,8 @@ static void end_step(void)
 {
     step_active = 0;
     model.romsel = predicted_romsel;
+    model.pia0_crb = predicted_crb;
+    model.mux = predicted_mux;
     long diff = -1;
     for (unsigned a = 0; a < GAME_RAM && diff == -1; a++)
         if (!stack(a) && has_prediction[a] && !written[a] && predicted[a] != board.ram[a]) diff = a;
@@ -264,8 +287,11 @@ static void step_hook(Board *b)
 static void write_hook(Board *b, uint16_t a, uint8_t v)
 {
     (void)b;
-    if (a == 0xC900) {
-        if (!step_active || irq_depth) model.romsel = v;
+    if (a == 0xC900 || a == 0xC807) { /* the I/O the model keeps: copied, as RAM, outside ported steps */
+        if (!step_active || irq_depth) {
+            if (a == 0xC900) model.romsel = v;
+            else game_poke(&model, a, v);
+        }
         return;
     }
     if (a >= GAME_RAM) return;

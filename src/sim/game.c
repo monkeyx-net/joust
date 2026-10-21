@@ -6,6 +6,7 @@
 
 #include "sim/checksum.h"
 #include "sim/collide.h"
+#include "sim/flow.h"
 #include "sim/lava.h"
 #include "sim/prng.h"
 #include "sim/scores.h"
@@ -28,7 +29,10 @@ uint8_t game_read(const Game *g, uint16_t addr)
 {
     if (addr < 0x9000 && (g->romsel & 1)) return g->rom[addr];
     if (addr < GAME_RAM) return g->ram[addr];
-    return g->rom[addr];
+    if (addr >= 0xD000) return g->rom[addr];
+    if (addr == 0xC804) return (uint8_t)(((g->mux ? g->inp1 : g->inp2) & 0x0F) | (g->in0 & 0x30));
+    if (addr == 0xC807) return g->pia0_crb;
+    return 0;
 }
 
 uint16_t game_read_word(const Game *g, uint16_t addr)
@@ -40,8 +44,14 @@ uint8_t game_peek(const Game *g, uint16_t addr) { return addr < GAME_RAM ? g->ra
 
 void game_poke(Game *g, uint16_t addr, uint8_t value)
 {
+    if (addr == 0xC807) { /* as pia6821.c: the IRQ flags stay; CB2 follows bit 3 in its manual output mode */
+        g->pia0_crb = (uint8_t)((g->pia0_crb & 0xC0) | (value & 0x3F));
+        if ((value & 0x30) == 0x30) g->mux = (value >> 3) & 1;
+        return;
+    }
+    if (addr >= GAME_RAM) return;
     if (g->on_write) g->on_write(g->user, addr);
-    if (addr < GAME_RAM) g->ram[addr] = value;
+    g->ram[addr] = value;
 }
 
 uint16_t game_word(const Game *g, uint16_t addr)
@@ -74,6 +84,15 @@ void game_blit(Game *g, uint8_t ctrl, uint8_t solid, uint16_t src, uint16_t dst,
     williams_blit(&bus, ctrl, solid, src, dst, w_reg, h_reg);
 }
 
+uint16_t game_controls(Game *g)
+{
+    game_poke(g, 0xC807, game_read(g, 0xC807) | 0x08);
+    uint8_t a = game_read(g, 0xC804) & 0x37;
+    game_poke(g, 0xC807, game_read(g, 0xC807) & 0xF7);
+    uint8_t b = game_read(g, 0xC804) & 0x07;
+    return (uint16_t)(a << 8 | b);
+}
+
 uint8_t game_random(Game *g, int *carry)
 {
     Prng p = { g->ram[RNG], g->ram[RNG + 1] };
@@ -96,7 +115,7 @@ void game_sound(Game *g, uint16_t script)
 int game_step_ported(const Game *g, uint16_t task)
 {
     uint16_t at = game_word(g, (uint16_t)(task + TASK_RESUME));
-    return checksum_ported(at) || lava_ported(at) || collide_ported(at) || scores_ported(at);
+    return checksum_ported(at) || lava_ported(at) || collide_ported(at) || scores_ported(at) || flow_ported(at);
 }
 
 StepResult game_step(Game *g, uint16_t task)
@@ -106,5 +125,6 @@ StepResult game_step(Game *g, uint16_t task)
     if (lava_ported(at)) return lava_step(g, task, at);
     if (collide_ported(at)) return collide_step(g, task, at);
     if (scores_ported(at)) return scores_step(g, task, at);
+    if (flow_ported(at)) return flow_step(g, task, at);
     return STEP_UNPORTED;
 }

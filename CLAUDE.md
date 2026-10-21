@@ -94,7 +94,10 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   `checksum.c` (the ROM check task, $ECF8), `lava.c` (the lava's surface
   and bubbles, $E4E6), `collide.c` (the collision walks $837F/$83A4, the
   pair test $83D8 and the data test $DC21; a collision's handlers not yet),
-  `scores.c` (the score digits, $E785; blitted with `game_blit`);
+  `scores.c` (the score digits, $E785; blitted with `game_blit`),
+  `flow.c` (the start buttons' task $6364 and a countdown $62AD, their
+  frequent paths); the model also keeps the controls, PIA 0's $C807 and
+  its multiplexer (`game_controls`, $6BA6);
   each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata

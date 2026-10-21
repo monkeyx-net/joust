@@ -21,6 +21,12 @@ typedef struct {
     uint8_t ram[GAME_RAM];
     const uint8_t *rom; /* 64 KB by address: $0000-$8FFF and $D000-$FFFF hold program ROM */
     uint8_t romsel;     /* $C900 as last written */
+    /* the controls as the board's PIA 0 shows them: IN0's start buttons
+       (bits 4-5 of $C804), and each player's (bits 0-3, by the
+       multiplexer: CB2, set through $C807, high for player 1) */
+    uint8_t in0, inp1, inp2;
+    uint8_t pia0_crb;   /* $C807 */
+    int mux;            /* CB2 as $C807 last set it */
     /* optional, for tests: called before each RAM write the C game makes */
     void (*on_write)(void *user, uint16_t addr);
     void *user;
@@ -34,10 +40,12 @@ typedef enum {
 /* The whole state from a RAM image of $0000-$BFFF and the ROM select. */
 void game_load(Game *g, const uint8_t *ram, uint8_t romsel);
 /* A byte as the main CPU reads it: ROM under $0000-$8FFF when selected,
-   RAM below $C000, ROM from $D000. (I/O reads are not modelled.) */
+   RAM below $C000, ROM from $D000; of the I/O, the controls ($C804) and
+   PIA 0's control register B ($C807); other I/O reads give 0. */
 uint8_t game_read(const Game *g, uint16_t addr);
 uint16_t game_read_word(const Game *g, uint16_t addr);
-/* A RAM byte or big-endian word. */
+/* A RAM byte or big-endian word. A poke at $C807 sets PIA 0's control
+   register B (and the multiplexer); other I/O is not modelled. */
 uint8_t game_peek(const Game *g, uint16_t addr);
 void game_poke(Game *g, uint16_t addr, uint8_t value);
 uint16_t game_word(const Game *g, uint16_t addr);
@@ -49,6 +57,10 @@ void game_select_rom(Game *g, uint8_t value);
    w_reg and h_reg before the XOR 4), on the C game's RAM: gfx/williams.c's
    blitter, which the board's is too. Each byte goes through on_write. */
 void game_blit(Game *g, uint8_t ctrl, uint8_t solid, uint16_t src, uint16_t dst, uint8_t w_reg, uint8_t h_reg);
+
+/* $6BA6: both players' controls through the multiplexer: A player 1's
+   and the start buttons (& $37), B player 2's (& $07). */
+uint16_t game_controls(Game *g);
 
 /* $E4C0 (through $E018): the random generator's step on <$0D-<$0E (sim/prng.h).
    Returns A; *carry (if not NULL) gets the carry the callers use. */

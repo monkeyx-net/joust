@@ -220,10 +220,23 @@ named; `game` checks each (section 3).
   [[$4A68]] + 2 + digit x $17 in the score's colour, interrupts masked.
   The C game blits on its own RAM (`game_blit`: gfx/williams.c's blitter,
   reading the ROM image).
+- **Controls** ($6BA6): both players' through PIA 0's multiplexer: CB2
+  high (`$C807` | 8) shows player 1's (A = $C804 & $37, with the start
+  buttons), low player 2's (B = $C804 & $07). The C game keeps the
+  controls, $C807 and the multiplexer (`Game.in0`, `inp1`, `inp2`,
+  `pia0_crb`, `mux`).
+- **Flow** (`sim/flow.c`, the frequent paths): the start buttons' task
+  ($6359 kills tasks of type $48, then $6364 every frame: <$B3 a coin to
+  show, then the start buttons at $C804; a coin or a start, $6368 and
+  $6380, not ported: credits in CMOS at <$F2 and $CC06, the $3Bxx CMOS
+  helpers); a countdown ($62AD: +D-E frames, <$11 counted up each, then
+  +$10 frames more watching both players' controls, reset to $3C while
+  player 1 holds right and player 2 left; its end at $62CE not ported).
 - The scripted game (`game`) runs 79 task addresses; ported so far: the
-  ROM check, the lava, the collision walks and the scores (16863 of 32206
-  steps). The most frequent left: $8F3D and $8F04 (a rider's step: the
-  controls at $D83D, then `[$30,U]`, $8E05, $D9A3), $65AE, $6364, $8D4D.
+  ROM check, the lava, the collision walks, the scores and the flow's
+  frequent paths (18035 of 32206 steps). The most frequent left: $8F3D
+  and $8F04 (a rider's step: the controls at $D83D, then `[$30,U]`,
+  $8E05, $D9A3), $65AE (<$4B's bits, drawing through $65EE), $8D4D.
 
 ## 3. Test plan
 
