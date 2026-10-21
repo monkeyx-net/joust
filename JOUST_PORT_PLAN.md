@@ -220,6 +220,16 @@ named; `game` checks each (section 3).
   [[$4A68]] + 2 + digit x $17 in the score's colour, interrupts masked.
   The C game blits on its own RAM (`game_blit`: gfx/williams.c's blitter,
   reading the ROM image).
+- **The display list** (`sim/display.c`): 10-byte nodes [control][solid]
+  [source][destination][width][height][next], the blitter's registers in
+  order (width and height XOR 4), taken one after another from <$2A. Four
+  bands of 64 lines, each with two chains whose tails ($A004 and $A006, +
+  $40 a band) point at the last node's next field; a node is linked there,
+  so the interrupt draws a band's nodes as the beam leaves it. $E2A1 /
+  $E2B8 (via $E01B / $E01E): a node on chain +4 / +6 for line B; $E2CF /
+  $E2F9 ($E021 / $E024): for the object at U (+B its line, +7 its x), <$31
+  the line, <$30 the column (x / 2), control $1A (solid 0) or $0A, | $20
+  for an odd x (shifted); $E322 / $E358 ($E027 / $E02A): two such nodes.
 - **Controls** ($6BA6): both players' through PIA 0's multiplexer: CB2
   high (`$C807` | 8) shows player 1's (A = $C804 & $37, with the start
   buttons), low player 2's (B = $C804 & $07). The C game keeps the
@@ -235,8 +245,10 @@ named; `game` checks each (section 3).
 - The scripted game (`game`) runs 79 task addresses; ported so far: the
   ROM check, the lava, the collision walks, the scores and the flow's
   frequent paths (18035 of 32206 steps). The most frequent left: $8F3D
-  and $8F04 (a rider's step: the controls at $D83D, then `[$30,U]`,
-  $8E05, $D9A3), $65AE (<$4B's bits, drawing through $65EE), $8D4D.
+  and $8F04 (a rider's step: the controls at $D83D, then `[$30,U]`, $8E05
+  (the frame: +$17, the box +$27-$29, the pictures +$1C/+$1E from +$18 and
+  +$1A), $8E4D (their nodes, through $E02A), $D9A3), $65AE (<$4B's bits,
+  drawing through $65EE), $8D4D.
 
 ## 3. Test plan
 
@@ -264,7 +276,8 @@ named; `game` checks each (section 3).
   the same RAM; results and all of RAM must match. So far $DC21 (20000
   random row lists, well formed and noise: 5384 overlap) and $83D8 (20000
   random pairs of task blocks: 1024 collide, where the ROM goes on to
-  $8418).
+  $8418), the display list's six node entries (20000 random chains, free
+  pointers and objects: the node returned and all of RAM).
 - **MAME** (label `mame`): `mame_rom_map`, `mame_capture` (video RAM and
   palette decoding against MAME snapshots), `mame_images` (the blitter
   against MAME's, per image and mode); later per-frame RAM traces of
