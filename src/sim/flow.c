@@ -8,7 +8,27 @@
 #define COIN_SHOWN 0xA0B3 /* <$B3 */
 #define FRAMES 0xA011     /* <$11 */
 
-int flow_ported(uint16_t at) { return at == STARTS_BEGIN || at == STARTS || at == COUNTDOWN; }
+#define MET 0xA04B
+#define PLATFORMS_MET 0x65AE
+#define COMBO_START 0x62DA
+#define COMBO 0x62DF
+#define TURN_TAKE 0x8B0E
+#define TURN_WAIT 0x8B1A
+
+int flow_ported(uint16_t at)
+{
+    switch (at) {
+    case STARTS_BEGIN:
+    case STARTS:
+    case COUNTDOWN:
+    case PLATFORMS_MET:
+    case COMBO_START:
+    case COMBO:
+    case TURN_TAKE:
+    case TURN_WAIT: return 1;
+    }
+    return 0;
+}
 
 /* $6364 */
 static StepResult starts(Game *g)
@@ -45,6 +65,23 @@ StepResult flow_step(Game *g, uint16_t u, uint16_t at)
         return task_sleep(g, 1, STARTS);
     case STARTS: return starts(g);
     case COUNTDOWN: return countdown(g, u);
+    case PLATFORMS_MET:
+        if (game_peek(g, MET)) return STEP_UNPORTED;
+        return task_sleep(g, 2, PLATFORMS_MET);
+    case COMBO_START: return task_sleep(g, 5, COMBO);
+    case COMBO:
+        if (game_controls(g) == 0x0201) return STEP_UNPORTED; /* $626B */
+        return task_sleep(g, 5, COMBO);
+    case TURN_TAKE:
+        game_poke(g, (uint16_t)(u + 0x16), game_peek(g, 0xA03A));
+        game_poke(g, 0xA03A, (uint8_t)(game_peek(g, 0xA03A) + 1));
+        return task_sleep(g, 1, TURN_WAIT);
+    case TURN_WAIT: {
+        uint8_t b = game_peek(g, (uint16_t)(u + 0x16));
+        if (game_peek(g, (uint16_t)(u + 2)) == 0x09) return STEP_UNPORTED; /* $8ABA */
+        if (game_peek(g, 0xA038) != game_peek(g, 0xA039) || b != game_peek(g, 0xA03B)) return task_sleep(g, 1, TURN_WAIT);
+        return STEP_UNPORTED; /* $8B2D */
+    }
     }
     return STEP_UNPORTED;
 }

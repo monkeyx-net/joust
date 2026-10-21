@@ -241,7 +241,11 @@ named; `game` checks each (section 3).
   $6380, not ported: credits in CMOS at <$F2 and $CC06, the $3Bxx CMOS
   helpers); a countdown ($62AD: +D-E frames, <$11 counted up each, then
   +$10 frames more watching both players' controls, reset to $3C while
-  player 1 holds right and player 2 left; its end at $62CE not ported).
+  player 1 holds right and player 2 left; its end at $62CE not ported);
+  idle paths: $65AE (the platforms met, <$4B, every 2 frames), $62DA/
+  $62DF (the same controls every 5 frames), $8B0E/$8B1A (a rider waiting
+  its turn to appear: a number from <$3A into +$16, then <$38 = <$39 and
+  <$3B its number; type 9 goes to $8ABA).
 - **Riders** (`sim/rider.c`): a task each; type $89 player 1, $8F the
   enemies, $0F/$09 riders the collision walks skip. The block: +7-8 x,
   +A-B the line (8.8), +D a table in ROM ($88EE player 1's, $8981-$89E3
@@ -296,8 +300,13 @@ named; `game` checks each (section 3).
 - The scripted game (`game`) runs 79 task addresses; ported so far: the
   ROM check, the lava, the collision walks, the scores, the flow's
   frequent paths and the riders whose brains are ported, in the air and
-  on the ground (27487 of 32206 steps run in ported tasks, 22868 all the
-  way in C). The most frequent left: the
+  on the ground (29799 of 32206 steps run in ported tasks, 24584 all the
+  way in C; `game_runner` 47990). Left: the enemies' brains ($7A83-$80A5,
+  coroutines at +$24; $793C), the spawn sequence ($8B2D, $8C1C/$8C56:
+  materialising on a pad), the lava's troll ($D9FC, $69DD), eggs and
+  hatching, the pterodactyl, a collision's handlers ($8418), scoring,
+  death and the waves, and the attract mode ($5F91-$5FA5, $D0FD, $D1E7,
+  $6925, $62DF's end). The most frequent left: the
   enemies' brains ($8F3D/$8F04 with types $8F), $65AE (<$4B's bits,
   drawing through $65EE), $8D4D (on the ground), $6D91, $7619.
 
