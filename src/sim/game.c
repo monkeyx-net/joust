@@ -29,7 +29,7 @@ void game_load(Game *g, const uint8_t *ram, uint8_t romsel)
 uint8_t game_read(const Game *g, uint16_t addr)
 {
     if (addr < 0x9000 && (g->romsel & 1)) return g->rom[addr];
-    if (addr < GAME_RAM) return g->ram[addr];
+    if (addr < GAME_RAM) return game_peek(g, addr);
     if (addr >= 0xD000) return g->rom[addr];
     if (addr == 0xC804) return (uint8_t)(((g->mux ? g->inp1 : g->inp2) & 0x0F) | (g->in0 & 0x30));
     if (addr == 0xC807) return g->pia0_crb;
@@ -41,7 +41,12 @@ uint16_t game_read_word(const Game *g, uint16_t addr)
     return (uint16_t)(game_read(g, addr) << 8 | game_read(g, (uint16_t)(addr + 1)));
 }
 
-uint8_t game_peek(const Game *g, uint16_t addr) { return addr < GAME_RAM ? g->ram[addr] : 0; }
+uint8_t game_peek(const Game *g, uint16_t addr)
+{
+    if (addr >= GAME_RAM) return 0;
+    if (g->on_read) g->on_read(g->user, addr);
+    return g->ram[addr];
+}
 
 void game_poke(Game *g, uint16_t addr, uint8_t value)
 {
@@ -96,7 +101,7 @@ uint16_t game_controls(Game *g)
 
 uint8_t game_random(Game *g, int *carry)
 {
-    Prng p = { g->ram[RNG], g->ram[RNG + 1] };
+    Prng p = { game_peek(g, RNG), game_peek(g, RNG + 1) };
     uint8_t a = prng_step(&p, carry);
     game_poke(g, RNG, p.hi); /* ROR <$0D, then ROR <$0E */
     game_poke(g, RNG + 1, p.lo);

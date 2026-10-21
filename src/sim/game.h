@@ -27,8 +27,10 @@ typedef struct {
     uint8_t in0, inp1, inp2;
     uint8_t pia0_crb;   /* $C807 */
     int mux;            /* CB2 as $C807 last set it */
-    /* optional, for tests: called before each RAM write the C game makes */
+    /* optional, for tests: called before each RAM write the C game makes,
+       and on each RAM read */
     void (*on_write)(void *user, uint16_t addr);
+    void (*on_read)(void *user, uint16_t addr);
     void *user;
 } Game;
 

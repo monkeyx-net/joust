@@ -316,7 +316,13 @@ named; `game` checks each (section 3).
   Steps an interrupt broke into must match with the interrupt's writes
   before or after the C step, or replayed where they fell among its
   writes; a race the C game cannot have (the ROM reading partly before the
-  interrupt) is counted and must stay under 1 in 1000. Between steps the
+  interrupt) is counted and must stay under 1 in 1000: bytes that differ
+  were written by the interrupt, or the C step read one it wrote. The
+  races seen so far are all the interrupt breaking into the random step
+  at $E4CA, between `ROR <$0D` and `ROR <$0E`, so its stir lands half-way
+  through the generator's update (3 in `game_runner`'s 57872 steps).
+  `game_runner` is a second, longer game (12000 frames: running on the
+  ground, a flap now and then, idle to the game's end). Between steps the
   model must equal RAM every frame. The stack page $BE00-$BEFF is not
   compared. A planted bug in either ported task is caught at the byte.
   Next, as Defender's: checks of the interrupt's routines per call, and

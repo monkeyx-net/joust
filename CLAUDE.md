@@ -137,13 +137,15 @@ Every change keeps `ctest` green.
   A052=05` for unlimited lives once a game runs).
 - `mame_prng` - label `mame`: every stir and step of the random state from
   power-on, replayed through `sim/prng.c`
-- `game` - label `rom`: a C model of all of RAM follows the board's
+- `game`, `game_runner` - label `rom`: a C model of all of RAM follows the board's
   scripted game (writes copied, the blitter's too, through `WilliamsBus.on_write`);
   ported task steps run in C when the dispatcher starts them ($E154) and the
   model must equal RAM and the ROM select when the ROM's step yields ($E15F).
   A step an interrupt broke into must match with the interrupt's writes all
   before or all after it, or replayed where they fell among its writes; a
-  race the C game cannot have is counted and must stay under 1 in 1000.
+  race the C game cannot have is counted and must stay under 1 in 1000
+  (reported with where the interrupt broke in: so far always $E4CA, inside
+  the random step). `game_runner` is a second, longer game.
   The stack page $BE00-$BEFF is not compared. It prints the steps not
   ported by resume address (the to-do list) and, for ported ones, how
   many ran all the way in C (matched/run). Port a task's steps with the

@@ -1,9 +1,10 @@
 /*
  * The C game's task steps against the emulated board (label rom):
- *   test_game <joust.zip|folder>
+ *   test_game <joust.zip|folder> [runner]
  * Plays a scripted game on the board (a coin, a start, then player 1
- * running and flapping) while a C model of all of RAM (sim/game.h)
- * follows it:
+ * running and flapping; `runner`: 12000 frames of mostly running on the
+ * ground, a flap now and then, then idle to the game's end) while a C
+ * model of all of RAM (sim/game.h) follows it:
  *   - every write the board makes (the CPU's and the blitter's) is copied
  *     to the model, except during a ported task step;
  *   - when the ROM's dispatcher runs a task whose step is ported ($E154,
@@ -22,7 +23,9 @@
  * bytes that differ include some the interrupt wrote, the ROM read part
  * of the state before the interrupt and part after: a race the C game,
  * which never interrupts a routine, cannot have; counted, at most 1 in
- * 1000 steps. Between steps the model must equal RAM at every frame (a
+ * 1000 steps. So is a step that read (in C) a byte the interrupt wrote
+ * (e.g. the random state the interrupt stirs, read before the stir and
+ * rotated after it). Between steps the model must equal RAM at every frame (a
  * check of the copying). The stack page ($BE00-$BEFF) is never compared.
  */
 #include <stdio.h>
@@ -36,6 +39,7 @@
 
 #define PRIME_FRAMES 1800
 #define FRAMES 6000
+#define RUNNER_FRAMES 12000
 #define DISPATCH 0xE154      /* JMP [5,U] */
 #define DISPATCH_NEXT 0xE15F /* where a sleep or an end comes back to */
 #define STACK_FROM 0xBE00
@@ -54,7 +58,7 @@ static int stack(unsigned a) { return a >= STACK_FROM && a < STACK_TO; }
 static struct { uint16_t addr; uint8_t value; } irq_writes[16384];
 static int irq_count;
 static uint32_t step_seq[GAME_RAM], irq_seq[GAME_RAM], seq; /* when each byte was last written */
-static struct { long after; int first, count; } irqs[64]; /* where each interrupt fell in the step */
+static struct { long after; int first, count; uint16_t pc; } irqs[64]; /* where each interrupt fell in the step */
 static int irq_n;
 static long step_writes;
 static uint16_t irq_s[8]; /* S before each interrupt in progress pushed */
@@ -64,6 +68,13 @@ static int irq_depth;
 
 static uint16_t step_task, step_at;
 static uint8_t predicted[GAME_RAM], has_prediction[GAME_RAM], written[GAME_RAM], predicted_romsel, predicted_crb;
+static uint8_t c_read[GAME_RAM]; /* what the C step read */
+
+static void read_hook(void *user, uint16_t addr)
+{
+    (void)user;
+    c_read[addr] = 1;
+}
 static int predicted_mux;
 static int step_active, step_interrupted;
 static long steps, steps_unported, steps_matched, steps_reordered, steps_raced, frame_checks;
@@ -179,10 +190,11 @@ static int matches_reordered(void)
     return matches_interleaved(); /* or where it fell */
 }
 
+/* Did the interrupt during the step write a byte that differs, or one the C step read? */
 static int irq_touched_difference(void)
 {
     for (unsigned a = 0; a < GAME_RAM; a++)
-        if (!stack(a) && model.ram[a] != board.ram[a] && irq_seq[a]) return 1;
+        if (!stack(a) && irq_seq[a] && (model.ram[a] != board.ram[a] || c_read[a])) return 1;
     return 0;
 }
 
@@ -216,7 +228,11 @@ static void start_step(uint16_t task)
     memset(irq_seq, 0, sizeof irq_seq);
     seq = 0;
     scratch = model;
-    if (game_step(&scratch, task) == STEP_UNPORTED) { /* a path not ported: the ROM's writes are copied */
+    memset(c_read, 0, sizeof c_read);
+    scratch.on_read = read_hook;
+    StepResult r = game_step(&scratch, task);
+    scratch.on_read = NULL;
+    if (r == STEP_UNPORTED) { /* a path not ported: the ROM's writes are copied */
         steps_unported++;
         return;
     }
@@ -251,9 +267,12 @@ static void end_step(void)
     } else if (step_interrupted && matches_reordered()) {
         steps_reordered++;
     } else if (step_interrupted && diff >= 0 && irq_touched_difference()) {
-        if (steps_raced++ < 3)
-            fprintf(stderr, "test_game: frame %lld: a race (an interrupt inside the ROM's step $%04X, $%04lX differs)\n",
-                    (long long)board.frame, step_task, diff);
+        if (steps_raced++ < 3) {
+            fprintf(stderr, "test_game: frame %lld: a race (an interrupt inside the ROM's step $%04X at $%04X, $%04lX differs;"
+                            " interrupted at", (long long)board.frame, step_task, step_at, diff);
+            for (int k = 0; k < irq_n; k++) fprintf(stderr, " $%04X", irqs[k].pc);
+            fprintf(stderr, ")\n");
+        }
     } else {
         report(diff, step_interrupted ? "after an interrupted step" : "after a step");
     }
@@ -274,6 +293,8 @@ static void step_hook(Board *b)
                 irqs[irq_n].after = step_writes;
                 irqs[irq_n].first = irq_count;
                 irqs[irq_n].count = 0;
+                /* the PC it interrupted, stacked under CC, A, B, DP, X, Y, U */
+                irqs[irq_n].pc = (uint16_t)(b->ram[(uint16_t)(b->cpu.s + 10)] << 8 | b->ram[(uint16_t)(b->cpu.s + 11)]);
                 irq_n++;
             }
         }
@@ -317,22 +338,32 @@ static void write_hook(Board *b, uint16_t a, uint8_t v)
     /* else C did not write it: the model keeps its byte, and differs if the ROM's does */
 }
 
-/* A coin, a 1-player start, then player 1 runs right and left and flaps. */
+static int runner;
+
+/* A coin, a 1-player start, then player 1 runs right and left and flaps
+   (the runner: runs, flaps one frame in 200, idle after 8000). */
 static void controls(long f)
 {
     board.in2 = f >= 1200 && f < 1215 ? IN2_COIN1 : 0;
     board.in0 = f >= 1300 && f < 1315 ? IN0_START1 : 0;
     board.inp1 = 0;
-    if (f > 1400)
-        board.inp1 = (uint8_t)((f % 90 < 40 ? INP_RIGHT : f % 90 < 70 ? INP_LEFT : 0) | (f % 12 < 3 ? INP_FLAP : 0));
+    if (f <= 1400) return;
+    if (runner) {
+        if (f < 8000)
+            board.inp1 = (uint8_t)((f % 300 < 140 ? INP_RIGHT : f % 300 < 150 ? 0 : f % 300 < 290 ? INP_LEFT : 0) |
+                                   (f % 200 == 0 ? INP_FLAP : 0));
+        return;
+    }
+    board.inp1 = (uint8_t)((f % 90 < 40 ? INP_RIGHT : f % 90 < 70 ? INP_LEFT : 0) | (f % 12 < 3 ? INP_FLAP : 0));
 }
 
 int main(int argc, char **argv)
 {
-    if (argc != 2) {
-        fprintf(stderr, "usage: test_game <joust.zip|folder>\n");
+    if (argc < 2 || argc > 3 || (argc == 3 && strcmp(argv[2], "runner"))) {
+        fprintf(stderr, "usage: test_game <joust.zip|folder> [runner]\n");
         return 2;
     }
+    runner = argc == 3;
     char err[512];
     if (rom_load(&rom, argv[1], err, sizeof err)) {
         fprintf(stderr, "test_game: %s\n", err);
@@ -351,7 +382,7 @@ int main(int argc, char **argv)
     load_model();
     board.step_hook = step_hook;
     board.write_hook = write_hook;
-    for (long f = 1; f <= FRAMES; f++) {
+    for (long f = 1; f <= (runner ? RUNNER_FRAMES : FRAMES); f++) {
         controls(f);
         board_run_frame(&board, NULL);
         if (!step_active) {
