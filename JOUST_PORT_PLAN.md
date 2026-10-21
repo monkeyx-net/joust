@@ -284,6 +284,24 @@ named; `game` checks each (section 3).
   the screen's side, where it sleeps 60 frames in the brain (the task
   resumes at $EF08: not ported). The lava ($D899) and the enemies' other
   brains are not ported yet.
+- **The enemies' brains** ($7A83-$80D5, `sim/brains.c`): state machines,
+  the state's address at +$24; each state sets <$32-<$33 and usually the
+  next state, and returns. Three families ($7A83 on, $7C95 on, $7ECF on),
+  each starting over at its first state; shared exits ($7BD3, $7E25,
+  $802F: the direction by the facing, a push at +$22 taking it over;
+  $7C7D/$7C87: flapping above the lava, below line $D3 or $D0). They use
+  the wave's settings ($B1B4-$B1FF: frames between looks, line gaps,
+  velocities, countdowns), +$2B-2C a remembered line or velocity sum, +$2D
+  a countdown, +$2E/+$2F a turn when the target's speed index matches,
+  +$32 frames to the next look, the platform maps (an edge ahead: $AEA2 +
+  x against $E829 + line; a wall where the rider will be in 8 frames:
+  $AE83/$AEC1 + x against $E837 + line + (velocity << 3) >> 8), and $80D6
+  (the nearer player: <$73, <$75, <$A8/<$A9 for who is out; nearness by
+  -|line difference|, or by x when within 256, the last comparison by the
+  second player's x byte against the first's measure). $7AD5 (<$8E below
+  <$8F: one more brain running, +$34) and $7C90 jump to the table's +2.
+  Not ported: $793C (a riderless mount walking to its knight, $7A2F
+  picking it up).
 - **Platforms** ($D9A3-$DC20, `sim/platform.c`): a platform's top under a
   rider ($B002 + x against $EA97 + line) lands it ($D9C2: its line set to
   $44, $50, $80, $89, $A2 or $D2 by the bits; the lava's line, $D9FC, is
@@ -300,9 +318,9 @@ named; `game` checks each (section 3).
 - The scripted game (`game`) runs 79 task addresses; ported so far: the
   ROM check, the lava, the collision walks, the scores, the flow's
   frequent paths and the riders whose brains are ported, in the air and
-  on the ground (29799 of 32206 steps run in ported tasks, 24584 all the
-  way in C; `game_runner` 47990). Left: the enemies' brains ($7A83-$80A5,
-  coroutines at +$24; $793C), the spawn sequence ($8B2D, $8C1C/$8C56:
+  on the ground (29799 of 32206 steps run in ported tasks, 28089 all the
+  way in C; `game_runner` 55524; `game_two` 56499). Left: $793C, the
+  spawn sequence ($8B2D, $8C1C/$8C56:
   materialising on a pad), the lava's troll ($D9FC, $69DD), eggs and
   hatching, the pterodactyl, a collision's handlers ($8418), scoring,
   death and the waves, and the attract mode ($5F91-$5FA5, $D0FD, $D1E7,
@@ -331,7 +349,8 @@ named; `game` checks each (section 3).
   at $E4CA, between `ROR <$0D` and `ROR <$0E`, so its stir lands half-way
   through the generator's update (3 in `game_runner`'s 57872 steps).
   `game_runner` is a second, longer game (12000 frames: running on the
-  ground, a flap now and then, idle to the game's end). Between steps the
+  ground, a flap now and then, idle to the game's end), `game_two` a
+  two-player game (9000 frames). Between steps the
   model must equal RAM every frame. The stack page $BE00-$BEFF is not
   compared. A planted bug in either ported task is caught at the byte.
   Next, as Defender's: checks of the interrupt's routines per call, and
@@ -345,7 +364,9 @@ named; `game` checks each (section 3).
   $8418), the display list's six node entries (20000 random chains, free
   pointers and objects: the node returned and all of RAM), $D9A3 on a
   game in progress with the player at random x, line, velocity, speed and
-  push (20000: 2192 land, 2236 bounce; $DC21's end rows checked too).
+  push (20000: 2192 land, 2236 bounce; $DC21's end rows checked too),
+  $80D6 on random players near each other or not, missing or out (20000:
+  X and the Z flag).
 - **MAME** (label `mame`): `mame_rom_map`, `mame_capture` (video RAM and
   palette decoding against MAME snapshots), `mame_images` (the blitter
   against MAME's, per image and mode); later per-frame RAM traces of

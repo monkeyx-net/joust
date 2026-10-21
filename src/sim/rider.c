@@ -1,5 +1,6 @@
 #include "sim/rider.h"
 
+#include "sim/brains.h"
 #include "sim/display.h"
 #include "sim/platform.h"
 #include "sim/tasks.h"
@@ -139,7 +140,7 @@ static int brain(Game *g, uint16_t u, StepResult *slept)
         return BRAIN_SET;
     }
     }
-    return BRAIN_UNPORTED;
+    return brain_enemy(g, u, b) ? BRAIN_UNPORTED : BRAIN_SET;
 }
 
 /* $D83D: the brain, the facing, frames since a flap, the erase nodes; as brain() */

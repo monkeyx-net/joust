@@ -20,6 +20,9 @@
  *     platform maps), the player's block at random x, line, velocity,
  *     speed and push: landing or flying (the Z flag) and all of RAM; the
  *     cases that start the troll's hand ($DA0E) are skipped
+ *   - $80D6, the enemies' target (sim/brains.c): the two players' blocks
+ *     at random lines and x (near each other often, for the ties), or
+ *     missing, either out (<$A8, <$A9): found (Z clear) and X
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +30,7 @@
 
 #include "assets/rom.h"
 #include "emu/board.h"
+#include "sim/brains.h"
 #include "sim/collide.h"
 #include "sim/display.h"
 #include "sim/game.h"
@@ -203,6 +207,42 @@ static void display_cases(void)
     printf("test_routines: display list nodes: %d cases over the 6 entries\n", CASES);
 }
 
+static void target_cases(void)
+{
+    long found = 0, second = 0;
+    const uint16_t p1 = 0xA400, p2 = 0xA500;
+    for (int i = 0; i < CASES; i++) {
+        for (int k = 0; k < 0x38; k++) board.ram[p1 + k] = board.ram[p2 + k] = board.ram[TASK_U + k] = (uint8_t)rnd();
+        int near = rnd() % 2;
+        for (int k = 0; k < 3; k++) {
+            uint16_t t = k == 0 ? TASK_U : k == 1 ? p1 : p2;
+            int x = near ? 0x80 + (int)(rnd() % 16) : (int)(rnd() % 0x130);
+            poke_word((uint16_t)(t + 7), (uint16_t)x);
+            board.ram[t + 0xB] = (uint8_t)(near ? 0x80 + rnd() % 16 : rnd());
+        }
+        poke_word(0xA073, rnd() % 8 ? p1 : 0);
+        poke_word(0xA075, rnd() % 4 ? p2 : 0);
+        board.ram[0xA0A8] = (uint8_t)(rnd() % 5 ? 0 : rnd());
+        board.ram[0xA0A9] = (uint8_t)(rnd() % 5 ? 0 : rnd());
+        sync_model();
+        board.cpu.u = TASK_U;
+        if (call(0x80D6, 0) != RETURN) {
+            if (failures++ < 8) fprintf(stderr, "test_routines: $80D6 case %d did not return\n", i);
+            continue;
+        }
+        uint16_t x;
+        int rom = !(board.cpu.cc & 0x04), c = brain_target(&model, TASK_U, &x);
+        found += rom;
+        second += rom && board.cpu.x == p2;
+        if ((rom != c || x != board.cpu.x) && failures++ < 8)
+            fprintf(stderr, "test_routines: $80D6 case %d: ROM %d X %04X, C %d X %04X\n", i, rom, board.cpu.x, c, x);
+        long d = first_difference();
+        if (d >= 0 && failures++ < 8)
+            fprintf(stderr, "test_routines: $80D6 case %d: $%04lX = %02X, C %02X\n", i, d, board.ram[d], model.ram[d]);
+    }
+    printf("test_routines: $80D6: %d cases, %ld found (%ld player 2)\n", CASES, found, second);
+}
+
 static void platform_cases(void)
 {
     /* a game in progress */
@@ -285,6 +325,7 @@ int main(int argc, char **argv)
     rows_cases();
     pair_cases();
     display_cases();
+    target_cases();
     platform_cases();
     if (failures) {
         fprintf(stderr, "test_routines: %d differences\n", failures);

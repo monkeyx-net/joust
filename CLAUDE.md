@@ -100,7 +100,9 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   its multiplexer (`game_controls`, $6BA6), `display.c` (the display
   list's nodes, $E2A1-$E38C), `rider.c` (the riders: in the air,
   $8F04/$8F3D, landing, on the ground, $8D4D, taking off and falling off;
-  the players' brains and $EEC2's; the enemies' brains not yet), `platform.c` (landing on a platform, bouncing off one, $D9A3);
+  the players' brains and $EEC2's), `brains.c` (the enemies' brains,
+  $7A83-$80D5: state machines as basic blocks by ROM address; $80D6 the
+  target), `platform.c` (landing on a platform, bouncing off one, $D9A3);
   each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
@@ -137,7 +139,7 @@ Every change keeps `ctest` green.
   A052=05` for unlimited lives once a game runs).
 - `mame_prng` - label `mame`: every stir and step of the random state from
   power-on, replayed through `sim/prng.c`
-- `game`, `game_runner` - label `rom`: a C model of all of RAM follows the board's
+- `game`, `game_runner`, `game_two` - label `rom`: a C model of all of RAM follows the board's
   scripted game (writes copied, the blitter's too, through `WilliamsBus.on_write`);
   ported task steps run in C when the dispatcher starts them ($E154) and the
   model must equal RAM and the ROM select when the ROM's step yields ($E15F).
@@ -145,7 +147,8 @@ Every change keeps `ctest` green.
   before or all after it, or replayed where they fell among its writes; a
   race the C game cannot have is counted and must stay under 1 in 1000
   (reported with where the interrupt broke in: so far always $E4CA, inside
-  the random step). `game_runner` is a second, longer game.
+  the random step). `game_runner` is a second, longer game, `game_two` a
+  two-player one.
   The stack page $BE00-$BEFF is not compared. It prints the steps not
   ported by resume address (the to-do list) and, for ported ones, how
   many ran all the way in C (matched/run). Port a task's steps with the
@@ -154,7 +157,7 @@ Every change keeps `ctest` green.
 - `routines` - label `rom`: ROM routines run on the emulated CPU (direct page
   $A0, interrupts masked) from chosen RAM and registers until they return,
   against the C ones on the same RAM: $DC21, $83D8, the display list's
-  nodes and $D9A3 (on a game in progress) on 20000 random cases each. Use it where scripted play rarely reaches a path; aim cases at the
+  nodes, $80D6 and $D9A3 (on a game in progress) on 20000 random cases each. Use it where scripted play rarely reaches a path; aim cases at the
   edges. `TRACE=1` prints the ROM's path for the first cases.
 - `mame_emu` - label `mame`: the emulated board from power-on with the primed
   CMOS and the probes' script: all 20000 random-state changes in MAME's order

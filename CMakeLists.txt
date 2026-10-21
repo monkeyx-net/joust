@@ -54,6 +54,7 @@ add_library(joust_core STATIC
   src/sim/display.c
   src/sim/rider.c
   src/sim/platform.c
+  src/sim/brains.c
   src/emu/m6809.c
   src/emu/pia6821.c
   src/emu/board.c
@@ -147,7 +148,8 @@ if(EXISTS "${JOUST_ROM}")
   target_link_libraries(test_game PRIVATE joust_core)
   add_test(NAME game COMMAND test_game "${JOUST_ROM}")
   add_test(NAME game_runner COMMAND test_game "${JOUST_ROM}" runner)
-  set_tests_properties(game game_runner PROPERTIES LABELS rom TIMEOUT 600)
+  add_test(NAME game_two COMMAND test_game "${JOUST_ROM}" two)
+  set_tests_properties(game game_runner game_two PROPERTIES LABELS rom TIMEOUT 600)
   add_executable(test_routines src/tests/test_routines.c)
   target_link_libraries(test_routines PRIVATE joust_core)
   add_test(NAME routines COMMAND test_routines "${JOUST_ROM}")

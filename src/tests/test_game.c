@@ -1,9 +1,10 @@
 /*
  * The C game's task steps against the emulated board (label rom):
- *   test_game <joust.zip|folder> [runner]
+ *   test_game <joust.zip|folder> [runner|two]
  * Plays a scripted game on the board (a coin, a start, then player 1
  * running and flapping; `runner`: 12000 frames of mostly running on the
- * ground, a flap now and then, then idle to the game's end) while a C
+ * ground, a flap now and then, then idle to the game's end; `two`: two
+ * coins, a 2-player start, both players playing, 9000 frames) while a C
  * model of all of RAM (sim/game.h) follows it:
  *   - every write the board makes (the CPU's and the blitter's) is copied
  *     to the model, except during a ported task step;
@@ -338,15 +339,23 @@ static void write_hook(Board *b, uint16_t a, uint8_t v)
     /* else C did not write it: the model keeps its byte, and differs if the ROM's does */
 }
 
-static int runner;
+static int runner, two;
 
 /* A coin, a 1-player start, then player 1 runs right and left and flaps
    (the runner: runs, flaps one frame in 200, idle after 8000). */
 static void controls(long f)
 {
+    board.inp1 = board.inp2 = 0;
+    if (two) {
+        board.in2 = (f >= 1200 && f < 1215) || (f >= 1350 && f < 1365) ? IN2_COIN1 : 0;
+        board.in0 = f >= 1500 && f < 1515 ? IN0_START2 : 0;
+        if (f <= 1600) return;
+        board.inp1 = (uint8_t)((f % 90 < 40 ? INP_RIGHT : f % 90 < 70 ? INP_LEFT : 0) | (f % 12 < 3 ? INP_FLAP : 0));
+        board.inp2 = (uint8_t)((f % 130 < 60 ? INP_LEFT : f % 130 < 100 ? INP_RIGHT : 0) | (f % 17 < 3 ? INP_FLAP : 0));
+        return;
+    }
     board.in2 = f >= 1200 && f < 1215 ? IN2_COIN1 : 0;
     board.in0 = f >= 1300 && f < 1315 ? IN0_START1 : 0;
-    board.inp1 = 0;
     if (f <= 1400) return;
     if (runner) {
         if (f < 8000)
@@ -359,11 +368,12 @@ static void controls(long f)
 
 int main(int argc, char **argv)
 {
-    if (argc < 2 || argc > 3 || (argc == 3 && strcmp(argv[2], "runner"))) {
-        fprintf(stderr, "usage: test_game <joust.zip|folder> [runner]\n");
+    if (argc < 2 || argc > 3 || (argc == 3 && strcmp(argv[2], "runner") && strcmp(argv[2], "two"))) {
+        fprintf(stderr, "usage: test_game <joust.zip|folder> [runner|two]\n");
         return 2;
     }
-    runner = argc == 3;
+    runner = argc == 3 && !strcmp(argv[2], "runner");
+    two = argc == 3 && !strcmp(argv[2], "two");
     char err[512];
     if (rom_load(&rom, argv[1], err, sizeof err)) {
         fprintf(stderr, "test_game: %s\n", err);
@@ -382,7 +392,7 @@ int main(int argc, char **argv)
     load_model();
     board.step_hook = step_hook;
     board.write_hook = write_hook;
-    for (long f = 1; f <= (runner ? RUNNER_FRAMES : FRAMES); f++) {
+    for (long f = 1; f <= (runner ? RUNNER_FRAMES : two ? 9000 : FRAMES); f++) {
         controls(f);
         board_run_frame(&board, NULL);
         if (!step_active) {
