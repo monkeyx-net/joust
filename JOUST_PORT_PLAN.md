@@ -206,9 +206,20 @@ named; `game` checks each (section 3).
   difference to <$34, the other task to <$49), then the collision data
   ([+$1C]: rows of left and right edges as words, ending in a negative
   word) through $DC21, an unrolled loop that decides by the 6809's flags
-  (overflow on `SUBD`) and returns a collision in the carry. A collision
-  goes on to the handlers at $8418 (who wins, eggs, bounces): not ported,
-  so a step meeting one is a path not ported (8 in the scripted game).
+  (overflow on `SUBD`) and returns a collision in the carry. The outcome
+  ($8418): both types without bit 0 go to $7535 (or a `SWI`); with bit 2
+  (the pterodactyl's kind) a bounce ($8487, the sound $EF9D: by their
+  boxes, $85D7, against a type $97, else by their lines, $84B7); with bit
+  3 straight to the lances' lines ($8466); else level lances (within 3, or
+  2 for a low frame, of +$26 + line) facing each other where U faces X
+  unhorse X ($850B). At $8466 the lance lines (+$26 + the 16-bit line):
+  equal is a tie ($847D: the sound $EFCE, both bounced, $852D: up/down by
+  +$23 and the velocities, apart by <$34's sign with turned speeds and
+  pushes of half their speed, facings away; the walk moves to the next
+  pair), the lower one unhorsed ($84C6 U, $850B X: not ported yet: the
+  type's bit 7 off, +$1A cleared, the brain $EEC2, the table's +$10
+  routine, $74C3 an enemy's egg or $8279 a player's death, and the
+  winner's +$16 scoring, $E6A8/$E6B1).
 - **Scores** ($E785-$E80C, `sim/scores.c`): a task per score, +D its
   table in ROM ($E71D for player 1's): +0 the change flag ($A050), +2 the
   colours (the second blit's control and solid), then 6-byte entries from
@@ -412,8 +423,10 @@ named; `game` checks each (section 3).
   chosen RAM and registers until it returns, and the C one on a model of
   the same RAM; results and all of RAM must match. So far $DC21 (20000
   random row lists, well formed and noise: 5384 overlap) and $83D8 (20000
-  random pairs of task blocks: 1024 collide, where the ROM goes on to
-  $8418), the display list's six node entries (20000 random chains, free
+  random pairs of task blocks, a third with level lances, through the
+  outcome: 281 ties, 126 bounces by their boxes, 660 at a path not
+  ported; it found the facing test reversed, which no scripted game had
+  reached), the display list's six node entries (20000 random chains, free
   pointers and objects: the node returned and all of RAM), $D9A3 on a
   game in progress with the player at random x, line, velocity, speed and
   push (20000: 2192 land, 2236 bounce; $DC21's end rows checked too),

@@ -148,7 +148,144 @@ done:
 
 int collide_rows(const Game *g, uint16_t x, uint16_t y, uint16_t dx) { return collide_rows_at(g, &x, &y, dx); }
 
-/* $83D8: 0 apart, -1 a collision (the handlers: not ported) */
+/* ---- a collision's outcome ($8418-$8635) ------------------------------ */
+
+static uint16_t F(uint16_t t, int off) { return (uint16_t)(t + off); }
+static int8_t sp(const Game *g, uint16_t t, int off) { return (int8_t)game_peek(g, F(t, off)); }
+
+/* $8599: x pushed down (+$23 $FE), a falling velocity reversed and halved */
+static void bump_down(Game *g, uint16_t x)
+{
+    game_poke(g, F(x, 0x23), 0xFE);
+    int16_t v = (int16_t)game_word(g, F(x, 0x11));
+    if (v > 0) game_set_word(g, F(x, 0x11), (uint16_t)((int16_t)-v >> 1));
+}
+
+/* $85AD: x pushed up (+$23 2), a rising velocity reversed and halved */
+static void bump_up(Game *g, uint16_t x)
+{
+    game_poke(g, F(x, 0x23), 2);
+    int16_t v = (int16_t)game_word(g, F(x, 0x11));
+    if (v < 0) game_set_word(g, F(x, 0x11), (uint16_t)((int16_t)-v >> 1));
+}
+
+/* $8539: apart sideways by the x difference <$34: speeds turned, pushes, facings */
+static void apart(Game *g, uint16_t u, uint16_t x)
+{
+    uint16_t d = game_word(g, DX);
+    if (!d) return;
+    int8_t a;
+    if (d & 0x8000) {
+        a = sp(g, x, 0x14);
+        if (a > 0) game_poke(g, F(x, 0x14), (uint8_t)(a = (int8_t)(-a + 2)));
+        game_poke(g, F(u, 0x22), (uint8_t)((int8_t)(-a + 2) >> 1));
+        game_poke(g, F(x, 0xF), 0xFF);
+        a = sp(g, u, 0x14);
+        if (a < 0) game_poke(g, F(u, 0x14), (uint8_t)(a = (int8_t)(-a - 2)));
+        game_poke(g, F(x, 0x22), (uint8_t)((int8_t)(-(int8_t)(a + 2)) >> 1));
+        game_poke(g, F(u, 0xF), 0);
+    } else {
+        a = sp(g, x, 0x14);
+        if (a < 0) game_poke(g, F(x, 0x14), (uint8_t)(a = (int8_t)(-a - 2)));
+        game_poke(g, F(u, 0x22), (uint8_t)((int8_t)(-(int8_t)(a + 2)) >> 1));
+        game_poke(g, F(x, 0xF), 0);
+        a = sp(g, u, 0x14);
+        if (a > 0) game_poke(g, F(u, 0x14), (uint8_t)(a = (int8_t)(-a + 2)));
+        game_poke(g, F(x, 0x22), (uint8_t)((int8_t)(-a + 2) >> 1));
+        game_poke(g, F(u, 0xF), 0xFF);
+    }
+}
+
+/* $852D: u pushed up, x down, then apart; $851F: the other way */
+static void bounce(Game *g, uint16_t u, uint16_t x, int u_up)
+{
+    if (u_up) {
+        bump_up(g, u);
+        bump_down(g, x);
+    } else {
+        bump_down(g, u);
+        bump_up(g, x);
+    }
+    apart(g, u, x);
+}
+
+/* $85D7: x off u by their boxes: up or down by their lines, sideways by their x */
+static void off_box(Game *g, uint16_t u, uint16_t x)
+{
+    int d = (int)game_peek(g, F(x, 0x27)) - game_peek(g, F(u, 0x27)) + game_peek(g, F(x, 0x28)) -
+            game_peek(g, F(u, 0x28));
+    if (d < 0) {
+        bump_down(g, x);
+        game_poke(g, F(x, 0x23), 0xFB);
+    } else {
+        bump_up(g, x);
+        game_poke(g, F(x, 0x23), 0x05);
+    }
+    uint16_t s = (uint16_t)(game_word(g, F(x, 7)) - game_word(g, F(u, 7)) + game_word(g, F(x, 0x29)) -
+                            game_word(g, F(u, 0x29)));
+    int8_t a = sp(g, x, 0x14);
+    if (s & 0x8000) {
+        if (a > 0) game_poke(g, F(x, 0x14), (uint8_t)-(int8_t)(a - 2));
+        game_poke(g, F(x, 0x22), (uint8_t)(-sp(g, u, 0x14) << 1));
+        game_poke(g, F(x, 0xF), 0xFF);
+    } else {
+        if (a < 0) game_poke(g, F(x, 0x14), (uint8_t)(-a - 2));
+        game_poke(g, F(x, 0x22), (uint8_t)(-sp(g, u, 0x14) << 1));
+        game_poke(g, F(x, 0xF), 0);
+    }
+}
+
+/* $84B7: bounced by their lines */
+static void by_lines(Game *g, uint16_t u, uint16_t x)
+{
+    bounce(g, u, x, (int8_t)(uint8_t)(game_peek(g, F(x, 0xB)) - game_peek(g, F(u, 0xB))) < 0);
+}
+
+/* $8418: 0 the walk goes on ($8413), 1 on to the next pair ($84DD), -1 a path not ported */
+static int outcome(Game *g, uint16_t u, uint16_t x)
+{
+    uint8_t both = game_peek(g, F(u, 2)) & game_peek(g, F(x, 2));
+    if (!(both & 1)) return -1; /* $7535 or a SWI */
+    if (both & 4) { /* $8487 */
+        game_sound(g, 0xEF9D);
+        if (game_peek(g, F(u, 2)) == 0x97) {
+            if (game_peek(g, F(x, 2)) == 0x97) by_lines(g, u, x);
+            else off_box(g, u, x);
+        } else if (game_peek(g, F(x, 2)) == 0x97) {
+            off_box(g, x, u);
+        } else {
+            by_lines(g, u, x);
+        }
+        return 0;
+    }
+    if (!(both & 8)) { /* $8431: level lances, facing each other */
+        uint8_t b = (uint8_t)(game_peek(g, F(u, 0x26)) + game_peek(g, F(u, 0xB)) - game_peek(g, F(x, 0xB)));
+        int near;
+        if (game_peek(g, F(x, 0x17)) > 0x0C) {
+            b = (uint8_t)(b - 8);
+            if (b & 0x80) b = (uint8_t)-b;
+            near = b <= 3;
+        } else {
+            b = (uint8_t)(b - 0x0A);
+            if (b & 0x80) b = (uint8_t)-b;
+            near = b <= 2;
+        }
+        if (near && ((game_peek(g, F(u, 0xF)) ^ game_peek(g, F(x, 0xF))) & 0x80)) {
+            int right = !(game_peek(g, F(u, 0xF)) & 0x80);
+            if ((game_word(g, DX) & 0x8000) ? !right : right) return -1; /* $850B: x unhorsed */
+        }
+    }
+    /* $8466: by their lance lines */
+    int d = (int)sp(g, x, 0x26) - sp(g, u, 0x26) + (int)(int16_t)game_word(g, F(x, 0xA)) -
+            (int)(int16_t)game_word(g, F(u, 0xA));
+    if ((uint16_t)d & 0x8000) return -1;   /* $84C6: u unhorsed */
+    if ((uint16_t)d) return -1;            /* $850B: x unhorsed */
+    game_sound(g, 0xEFCE);                /* $847D: a tie */
+    bounce(g, u, x, 1);
+    return 1;
+}
+
+/* $83D8: 0 apart (or met, the walk going on), 1 met (on to the next pair), -1 a path not ported */
 int collide_pair(Game *g, uint16_t u, uint16_t x)
 {
     game_set_word(g, OTHER, x);
@@ -174,7 +311,8 @@ int collide_pair(Game *g, uint16_t u, uint16_t x)
     } else {
         xx = (uint16_t)(xx + b); /* ABX */
     }
-    return collide_rows(g, xx, y, r.d) ? -1 : 0;
+    if (!collide_rows(g, xx, y, r.d)) return 0;
+    return outcome(g, u, x);
 }
 
 /* $837F: every pair of riders whose types share bit 0 */
@@ -188,7 +326,9 @@ static StepResult pairs(Game *g, uint16_t u)
         for (uint16_t x = game_word(g, u); x; x = game_word(g, x)) {
             uint8_t a = game_peek(g, (uint16_t)(x + 2));
             if (!(a & 0x80) || !(a & game_peek(g, (uint16_t)(u + 2)) & 1)) continue;
-            if (collide_pair(g, u, x)) return STEP_UNPORTED;
+            int r = collide_pair(g, u, x);
+            if (r < 0) return STEP_UNPORTED;
+            if (r) break; /* BCS: the next pair */
         }
     }
 }
@@ -208,10 +348,14 @@ static StepResult versus(Game *g, uint16_t u)
             x = game_word(g, x);
             if (!x) return task_sleep(g, 1, VERSUS);
         } while (!(game_peek(g, (uint16_t)(x + 2)) & 0x80));
-        if (collide_pair(g, u, x)) return STEP_UNPORTED;
+        int r = collide_pair(g, u, x);
+        if (r < 0) return STEP_UNPORTED;
+        if (r) continue; /* BCS $83B0 */
         for (x = game_word(g, x); x; x = game_word(g, x)) { /* $83CA: the others */
             if (!(game_peek(g, (uint16_t)(x + 2)) & 0x80)) continue;
-            if (collide_pair(g, u, x)) return STEP_UNPORTED;
+            r = collide_pair(g, u, x);
+            if (r < 0) return STEP_UNPORTED;
+            if (r) break;
         }
     }
 }

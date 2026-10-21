@@ -10,8 +10,10 @@
  *   - $DC21, the collision data test (sim/collide.c): random row lists
  *     (well formed, and noise for the overflow paths), random offsets;
  *     the carry and where X and Y end must match
- *   - $83D8, a pair's box and data test: random task blocks; it returns
- *     (apart) or goes on to the handlers at $8418 (a collision)
+ *   - $83D8, a pair's box and data test and its outcome ($8418: who wins,
+ *     bounces): random task blocks; it returns with the carry (the walk
+ *     goes on or moves to the next pair) or reaches a path not ported
+ *     (an unhorsing at $84E0, $7535, the SWI at $8428); all of RAM
  *   - the display list's nodes ($E2A1, $E2B8, $E2CF, $E2F9, $E322, $E358,
  *     sim/display.c): random chain tails, free pointer and objects; the
  *     node returned (X) and all of RAM must match
@@ -25,6 +27,7 @@
  *     missing, either out (<$A8, <$A9): found (Z clear) and X
  */
 #include <stdio.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -63,6 +66,12 @@ static void poke_word(uint16_t a, uint16_t v)
     board.ram[(uint16_t)(a + 1)] = (uint8_t)v;
 }
 
+/* where the outcome's unported paths begin */
+static const uint16_t outcome_stops[] = { 0x84E0, 0x7535, 0x8428 };
+static int stop_at_outcomes;
+static int tracing; /* ONLY=n: trace case n of the pair cases */
+static int visited_8487;
+
 /* Run the ROM from `pc` until it returns to RETURN or reaches `stop` (0: none). */
 static uint16_t call(uint16_t pc, uint16_t stop)
 {
@@ -73,7 +82,11 @@ static uint16_t call(uint16_t pc, uint16_t stop)
     board.cpu.cc |= CC_I | CC_F;
     for (long n = 0; n < 200000; n++) {
         if (board.cpu.pc == RETURN || (stop && board.cpu.pc == stop)) return board.cpu.pc;
-        if (getenv("TRACE")) fprintf(stderr, "  %04X D=%04X X=%04X Y=%04X CC=%02X\n", board.cpu.pc, board.cpu.a << 8 | board.cpu.b, board.cpu.x, board.cpu.y, board.cpu.cc);
+        if (stop_at_outcomes)
+            for (size_t k = 0; k < sizeof outcome_stops / sizeof outcome_stops[0]; k++)
+                if (board.cpu.pc == outcome_stops[k]) return board.cpu.pc;
+        if (board.cpu.pc == 0x8487) visited_8487 = 1;
+        if (getenv("TRACE") || tracing) fprintf(stderr, "  %04X D=%04X X=%04X Y=%04X CC=%02X\n", board.cpu.pc, board.cpu.a << 8 | board.cpu.b, board.cpu.x, board.cpu.y, board.cpu.cc);
         m6809_step(&board.cpu);
     }
     return 0xFFFF;
@@ -146,7 +159,8 @@ static void random_task(uint16_t t, uint16_t list)
 
 static void pair_cases(void)
 {
-    long hits = 0;
+    long bounces = 0, unported = 0, met = 0;
+    stop_at_outcomes = 1;
     for (int i = 0; i < (getenv("TRACE") ? 2 : CASES); i++) {
         random_task(TASK_U, LIST_X);
         random_task(TASK_X, LIST_Y);
@@ -154,17 +168,34 @@ static void pair_cases(void)
             memcpy(board.ram + TASK_X + 7, board.ram + TASK_U + 7, 2);
             board.ram[TASK_X + 0x27] = board.ram[TASK_U + 0x27];
         }
+        if (rnd() % 3 == 0) { /* level lances: a tie */
+            memcpy(board.ram + TASK_X + 0xA, board.ram + TASK_U + 0xA, 2);
+            board.ram[TASK_X + 0x26] = board.ram[TASK_U + 0x26];
+            board.ram[TASK_U + 2] |= 1;
+            board.ram[TASK_X + 2] |= 1;
+        }
         sync_model();
         board.cpu.u = TASK_U;
         board.cpu.x = TASK_X;
-        uint16_t end = call(0x83D8, 0x8418);
+        tracing = getenv("ONLY") && atoi(getenv("ONLY")) == i;
+        if (tracing)
+            fprintf(stderr, "types %02X %02X, +26 %02X %02X, +A %04X %04X, +17 %02X, +F %02X %02X\n",
+                    board.ram[TASK_U + 2], board.ram[TASK_X + 2], board.ram[TASK_U + 0x26], board.ram[TASK_X + 0x26],
+                    board.ram[TASK_U + 0xA] << 8 | board.ram[TASK_U + 0xB], board.ram[TASK_X + 0xA] << 8 | board.ram[TASK_X + 0xB],
+                    board.ram[TASK_X + 0x17], board.ram[TASK_U + 0xF], board.ram[TASK_X + 0xF]);
+        visited_8487 = 0;
+        uint16_t end = call(0x83D8, 0);
+        tracing = 0;
         if (end == 0xFFFF) {
             if (failures++ < 8) fprintf(stderr, "test_routines: $83D8 case %d did not return\n", i);
             continue;
         }
         int c = collide_pair(&model, TASK_U, TASK_X);
-        int rom = end == 0x8418 ? -1 : 0;
-        hits += rom == -1;
+        int rom = end != RETURN ? -1 : board.cpu.cc & 1;
+        unported += rom < 0;
+        bounces += rom == 1;
+        met += rom == 0 && visited_8487;
+        if (rom < 0 && c < 0) continue; /* both stop where the port does */
         if (rom != c) {
             if (failures++ < 8) fprintf(stderr, "test_routines: $83D8 case %d: ROM %d, C %d\n", i, rom, c);
             continue;
@@ -173,7 +204,10 @@ static void pair_cases(void)
         if (d >= 0 && failures++ < 8)
             fprintf(stderr, "test_routines: $83D8 case %d: $%04lX = %02X, C %02X\n", i, d, board.ram[d], model.ram[d]);
     }
-    printf("test_routines: $83D8: %d cases, %ld colliding\n", CASES, hits);
+    stop_at_outcomes = 0;
+    printf("test_routines: $83D8: %d cases, %ld reaching a path not ported, %ld bounced to the next pair, %ld bounced"
+           " by their boxes ($8487) and on\n",
+           CASES, unported, bounces, met);
 }
 
 static void display_cases(void)
