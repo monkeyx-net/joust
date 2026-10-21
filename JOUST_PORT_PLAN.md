@@ -261,9 +261,25 @@ named; `game` checks each (section 3).
   $124 and -10), $8E05 (frame $48 or $60, box, pictures), $D9A3 (the
   platform maps: RAM $B002 + x against ROM $EA97 + line, then $AEA2 + x
   against $E837 + line; neither: keep flying), $8E4D (draw nodes), a sleep
-  of [[+D]+$1A] frames. Ported for the players in the air; landing
-  ($8F87), the lava ($D899), $D9C2's platform classes, $DA3E and the
-  enemies' brains not yet.
+  of [[+D]+$1A] frames. Landing ($8F87): the run animation by the speed
+  (the table at $8FB5), at rest, frame $0C, then standing ($8DEF: a box 13
+  lines tall, the draw nodes, a sleep; $8D4D resumes). On the ground
+  ($8D4D): the brain; a fresh flap takes off ($8EA4: velocity $FF80, up a
+  line, then a flap's sound and frames); else +$13 keeps the flap, the
+  direction (turned by the facing) steps the run animation (+$20: records
+  [frames][routine][..][next by direction at +4..][speed at +6]; $DD2C the
+  skid, with its sound), and when its frames run out the record's routine
+  gives the frame and dx: $DD3A/$DD3C stand (or turn), $DD4D the run cycle
+  ($DD43's frames and dx, a footstep sound from the table's +$24/+$26 every
+  4 frames), $DD8E, $DD9C the skid (its sound once); x moves; no ground
+  under it ($B002 + x against $EA98 + line) falls off ($8EC8: into the air,
+  flapping or gliding); a wall ($AEA8 + x against $E837 + line) bumps it
+  (+$22 = |push| + 3, facing cleared, <$4B). Brains: the players' ($DDB2,
+  $DDB9) and $EEC2/$EF12, which flies to a line ($45, $81 or $D0 by where
+  it is, a flap when below it and not rising, alternate frames) and off
+  the screen's side, where it sleeps 60 frames in the brain (the task
+  resumes at $EF08: not ported). The lava ($D899) and the enemies' other
+  brains are not ported yet.
 - **Platforms** ($D9A3-$DC20, `sim/platform.c`): a platform's top under a
   rider ($B002 + x against $EA97 + line) lands it ($D9C2: its line set to
   $44, $50, $80, $89, $A2 or $D2 by the bits; the lava's line, $D9FC, is
@@ -279,8 +295,9 @@ named; `game` checks each (section 3).
   $EF8F; <$4B collects the bits met.
 - The scripted game (`game`) runs 79 task addresses; ported so far: the
   ROM check, the lava, the collision walks, the scores, the flow's
-  frequent paths and the players in the air with the platforms' bounces
-  (26478 of 32206 steps run in ported tasks, 21989 all the way in C). The most frequent left: the
+  frequent paths and the riders whose brains are ported, in the air and
+  on the ground (27487 of 32206 steps run in ported tasks, 22868 all the
+  way in C). The most frequent left: the
   enemies' brains ($8F3D/$8F04 with types $8F), $65AE (<$4B's bits,
   drawing through $65EE), $8D4D (on the ground), $6D91, $7619.
 

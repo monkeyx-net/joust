@@ -98,9 +98,9 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   `flow.c` (the start buttons' task $6364 and a countdown $62AD, their
   frequent paths); the model also keeps the controls, PIA 0's $C807 and
   its multiplexer (`game_controls`, $6BA6), `display.c` (the display
-  list's nodes, $E2A1-$E38C), `rider.c` (the riders: the players' steps
-  in the air, $8F04/$8F3D, with their controls, flap, motion, frame and
-  nodes), `platform.c` (landing on a platform, bouncing off one, $D9A3);
+  list's nodes, $E2A1-$E38C), `rider.c` (the riders: in the air,
+  $8F04/$8F3D, landing, on the ground, $8D4D, taking off and falling off;
+  the players' brains and $EEC2's; the enemies' brains not yet), `platform.c` (landing on a platform, bouncing off one, $D9A3);
   each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
