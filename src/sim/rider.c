@@ -73,27 +73,16 @@ move:;
     game_set_word(g, field(u, 7), (uint16_t)x);
 }
 
-/* $8E58/$8E70: fill a node from the frame record at y, at <$30-<$31 */
-static void fill(Game *g, uint16_t node, uint16_t rec)
-{
-    uint16_t d = game_read_word(g, (uint16_t)(rec + 2));
-    uint8_t col = (uint8_t)((d >> 8) + game_peek(g, DISPLAY_COLUMN)), line = (uint8_t)(d + game_peek(g, DISPLAY_LINE));
-    game_set_word(g, (uint16_t)(node + 4), (uint16_t)(col << 8 | line));
-    uint16_t pic = game_read_word(g, (uint16_t)(rec + 4));
-    game_set_word(g, (uint16_t)(node + 6), game_read_word(g, pic));
-    game_set_word(g, (uint16_t)(node + 2), (uint16_t)(pic + 2));
-}
-
 /* $8E8E (erase: chain 0) and $8E4D (draw: chain 1): the pictures' nodes */
 static void pictures(Game *g, uint16_t u, int chain)
 {
     uint16_t rider = game_word(g, field(u, 0x1E)), mount = game_word(g, field(u, 0x1C));
     if (rider) {
         uint16_t node = display_object(g, u, chain, 2);
-        fill(g, node, rider);
-        fill(g, (uint16_t)(node + 10), mount);
+        display_fill(g, node, rider);
+        display_fill(g, (uint16_t)(node + 10), mount);
     } else if (mount) {
-        fill(g, display_object(g, u, chain, 1), mount);
+        display_fill(g, display_object(g, u, chain, 1), mount);
     }
 }
 

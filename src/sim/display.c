@@ -16,6 +16,28 @@ uint16_t display_node(Game *g, int chain, uint8_t line)
     return node;
 }
 
+void display_fill(Game *g, uint16_t node, uint16_t rec)
+{
+    uint16_t d = game_read_word(g, (uint16_t)(rec + 2));
+    uint8_t col = (uint8_t)((d >> 8) + game_peek(g, DISPLAY_COLUMN)), line = (uint8_t)(d + game_peek(g, DISPLAY_LINE));
+    game_set_word(g, (uint16_t)(node + 4), (uint16_t)(col << 8 | line));
+    uint16_t pic = game_read_word(g, (uint16_t)(rec + 4));
+    game_set_word(g, (uint16_t)(node + 6), game_read_word(g, pic));
+    game_set_word(g, (uint16_t)(node + 2), (uint16_t)(pic + 2));
+}
+
+void display_clip(Game *g, uint16_t node)
+{
+    uint8_t top = game_peek(g, (uint16_t)(node + 5));
+    if ((uint8_t)((game_peek(g, (uint16_t)(node + 7)) ^ 4) + top) < 0xE0) return;
+    if (top < 0xE0) {
+        game_poke(g, (uint16_t)(node + 7), (uint8_t)((0xE0 - top) ^ 4));
+        return;
+    }
+    game_poke(g, (uint16_t)(node + 4), 0xF0);
+    game_set_word(g, (uint16_t)(node + 6), 0x0404);
+}
+
 uint16_t display_object(Game *g, uint16_t u, int chain, int nodes)
 {
     uint8_t line = game_peek(g, (uint16_t)(u + 0xB));

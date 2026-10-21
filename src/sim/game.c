@@ -6,6 +6,7 @@
 
 #include "sim/checksum.h"
 #include "sim/collide.h"
+#include "sim/eggs.h"
 #include "sim/flow.h"
 #include "sim/lava.h"
 #include "sim/prng.h"
@@ -122,7 +123,7 @@ void game_sound(Game *g, uint16_t script)
 int game_step_ported(const Game *g, uint16_t task)
 {
     uint16_t at = game_word(g, (uint16_t)(task + TASK_RESUME));
-    return checksum_ported(at) || lava_ported(at) || collide_ported(at) || scores_ported(at) || flow_ported(at) || rider_ported(at) || wave_ported(at);
+    return checksum_ported(at) || lava_ported(at) || collide_ported(at) || scores_ported(at) || flow_ported(at) || rider_ported(at) || wave_ported(at) || eggs_ported(at);
 }
 
 StepResult game_step(Game *g, uint16_t task)
@@ -135,5 +136,6 @@ StepResult game_step(Game *g, uint16_t task)
     if (flow_ported(at)) return flow_step(g, task, at);
     if (rider_ported(at)) return rider_step(g, task, at);
     if (wave_ported(at)) return wave_step(g, task, at);
+    if (eggs_ported(at)) return eggs_step(g, task, at);
     return STEP_UNPORTED;
 }

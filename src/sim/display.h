@@ -26,5 +26,10 @@
 uint16_t display_node(Game *g, int chain, uint8_t line);
 /* $E2CF / $E2F9 (nodes 1) and $E322 / $E358 (nodes 2) for the object at u */
 uint16_t display_object(Game *g, uint16_t u, int chain, int nodes);
+/* $8E70: fill a node from a frame record (+2 dx, dy from <$30-<$31; +4
+   the picture: its header's width and height, then its data) */
+void display_fill(Game *g, uint16_t node, uint16_t rec);
+/* $D8F4: clip a node at line $E0 (the lava): shortened, or emptied */
+void display_clip(Game *g, uint16_t node);
 
 #endif

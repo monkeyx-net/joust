@@ -100,7 +100,8 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   its multiplexer (`game_controls`, $6BA6), `display.c` (the display
   list's nodes, $E2A1-$E38C), `rider.c` (the riders: in the air,
   $8F04/$8F3D, landing, on the ground, $8D4D, taking off and falling off;
-  the players' brains and $EEC2's), `wave.c` (the wave manager's frequent path, $6D91), `brains.c` (the enemies' brains,
+  the players' brains and $EEC2's), `wave.c` (the wave manager's frequent path, $6D91), `eggs.c` (eggs in
+  flight and at rest; hatching not yet), `brains.c` (the enemies' brains,
   $7A83-$80D5: state machines as basic blocks by ROM address; $80D6 the
   target), `platform.c` (landing on a platform, bouncing off one, $D9A3);
   each mirrors a ROM routine's arithmetic exactly

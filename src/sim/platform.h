@@ -25,5 +25,10 @@
 /* $D9A3: 1 nothing to land on (it flies on, maybe bounced), 0 it lands
    (its line set), -1 a path not ported (the troll's hand) */
 int platform_below(Game *g, uint16_t u);
+/* $D9C2: a platform's top under the rider (its bits): 0 landed (its line
+   set), 1 not (the lava's line), -1 the troll's hand (not ported) */
+int platform_class(Game *g, uint16_t u, uint8_t top);
+/* $DA3E: beside or above it (its bits): the bounce, if the data meet */
+void platform_hit(Game *g, uint16_t u, uint8_t bits);
 
 #endif

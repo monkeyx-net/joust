@@ -123,8 +123,7 @@ static void judge(Game *g, uint16_t u, int form, uint16_t data, uint16_t d, uint
 
 static uint16_t data_of(const Game *g, uint16_t n) { return game_read_word(g, game_read_word(g, n)); }
 
-/* $DA3E */
-static void hit(Game *g, uint16_t u, uint8_t bits)
+void platform_hit(Game *g, uint16_t u, uint8_t bits)
 {
     game_poke(g, MET, bits | game_peek(g, MET));
     if (bits & 0x80) judge(g, u, FORM_C, data_of(g, 0x0E), 0x0036, 0x00D3);
@@ -156,11 +155,9 @@ static int land(Game *g, uint16_t u, uint8_t line)
     return 0;
 }
 
-int platform_below(Game *g, uint16_t u)
+int platform_class(Game *g, uint16_t u, uint8_t top)
 {
-    uint16_t x = game_word(g, field(u, 7)), y = game_word(g, field(u, 0xA));
-    uint8_t top = game_read(g, (uint16_t)(x - 0x4FFE)) & game_read(g, (uint16_t)(y - 0x1569));
-    if (top) { /* $D9C2 */
+    {
         if (top < 8) return land(g, u, top == 2 ? 0x50 : top > 2 ? 0x80 : 0x44);
         if (top == 8) return land(g, u, 0x89);
         if (top < 0x20) return land(g, u, 0xA2);
@@ -172,7 +169,14 @@ int platform_below(Game *g, uint16_t u)
         }
         return game_peek(g, field(u, 0xB)) ? 1 : 0;
     }
+}
+
+int platform_below(Game *g, uint16_t u)
+{
+    uint16_t x = game_word(g, field(u, 7)), y = game_word(g, field(u, 0xA));
+    uint8_t top = game_read(g, (uint16_t)(x - 0x4FFE)) & game_read(g, (uint16_t)(y - 0x1569));
+    if (top) return platform_class(g, u, top);
     uint8_t beside = game_read(g, (uint16_t)(x - 0x515E)) & game_read(g, (uint16_t)(y - 0x17C9));
-    if (beside) hit(g, u, beside);
+    if (beside) platform_hit(g, u, beside);
     return 1;
 }

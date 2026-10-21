@@ -290,6 +290,21 @@ named; `game` checks each (section 3).
   ported; the next wait from $6DE2 by +$1B); while <$A1 is set, every $70
   looks (+B) one more brain may run at once (<$8F up, kept from wrapping,
   when <$90). No enemies left: the wave's end ($6BDC, not ported).
+- **Eggs** (`sim/eggs.c`): an egg's task in flight ($7611 drawn, $7619
+  every <$B0 frames: erased ($6AF3), moved ($75B0: gravity <$48, the
+  ceiling under line $20, x by the speed table and $DDD2, then wrapped at
+  $120 and 4, the box +$27-29), the platforms beside it ($779B into <$4B;
+  the four-corner maps $AEA2/$AE98 + x against $E83D/$E844 + line, then
+  $DA3E's bounce), landing ($D9C2 on the three-column top map: the speed
+  index slowed by 2; a falling egg bounces up at a quarter of its speed
+  until it is slower than $FFE0 and still), or into the lava at line $E3
+  (<$AA one enemy fewer, the task ends). At rest ($76A7 every 12 frames:
+  pushed off, it falls again) +$2D counts down from $B1B7 to hatching
+  when <$A1 is below <$A2 ($76D0: <$A1 up, the sound $EF89, the knight's
+  task $8EAF; not ported). The picture ($78E3): by the speed index's sign
+  the frames at $791E/$7921, one by vertical speed (rising, falling past
+  $80, or between), offset into the records at [$0028], clipped at line
+  $E0 ($D8F4).
 - **A secret code** ($6B20-$6BA5, in `sim/flow.c`): during a game a task
   watches both players' controls ($6BA6) for $2502, then $1204, then
   $0506 (player 1 left+flap with start 1 and player 2 right; start 2 with
