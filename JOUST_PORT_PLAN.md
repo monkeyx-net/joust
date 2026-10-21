@@ -197,9 +197,24 @@ named; `game` checks each (section 3).
   frames apart, with the sound at $E692) or a dip (cleared, drawn back over
   three frames). It writes the screen with the ROM unselected (`$BFFF` is
   RAM's copy of $C900).
+- **Collisions** ($837A-$8417, $DC21, `sim/collide.c`): two tasks walk
+  the task list every frame. $837F pairs each task whose type has bit 7
+  with every such task after it whose type shares bit 0; $83A4 counts <$A8
+  and <$A9 down, then takes each task of type $89 against the riders after
+  it. A pair goes through $83D8: the boxes first (+7 x, +$29 the right
+  edge, 16-bit signed; +$27 and +$28 the top and bottom lines; the x
+  difference to <$34, the other task to <$49), then the collision data
+  ([+$1C]: rows of left and right edges as words, ending in a negative
+  word) through $DC21, an unrolled loop that decides by the 6809's flags
+  (overflow on `SUBD`) and returns a collision in the carry. A collision
+  goes on to the handlers at $8418 (who wins, eggs, bounces): not ported,
+  so a step meeting one is a path not ported (8 in the scripted game).
 - The scripted game (`game`) runs 79 task addresses; ported so far: the
-  ROM check and the lava (5328 of 32206 steps). The most frequent left:
-  $8F3D, $837F/$83A4, $65AE, $E7A6, $6364, $8F04, $8D4D.
+  ROM check, the lava and the collision walks (14549 of 32206 steps). The
+  most frequent left: $8F3D and $8F04 (a rider's step: the controls at
+  $D83D, then `[$30,U]`, $8E05, $D9A3), $65AE, $E7A6 (the scores: a
+  table of digits drawn by `JSR [4,X]`, $E7D4 blitting from the task, so
+  the C game needs the blitter on its RAM), $6364, $8D4D.
 
 ## 3. Test plan
 
@@ -219,9 +234,15 @@ named; `game` checks each (section 3).
   interrupt) is counted and must stay under 1 in 1000. Between steps the
   model must equal RAM every frame. The stack page $BE00-$BEFF is not
   compared. A planted bug in either ported task is caught at the byte.
-  Next, as Defender's: `routines` (ROM routines on chosen inputs), checks
-  of the interrupt's routines per call, and `frame` (the C game alone
-  against the board).
+  Next, as Defender's: checks of the interrupt's routines per call, and
+  `frame` (the C game alone against the board).
+- **Routines on chosen inputs** (label `rom`): `routines` runs a ROM
+  routine on the emulated CPU (interrupts masked, direct page $A0) from
+  chosen RAM and registers until it returns, and the C one on a model of
+  the same RAM; results and all of RAM must match. So far $DC21 (20000
+  random row lists, well formed and noise: 5384 overlap) and $83D8 (20000
+  random pairs of task blocks: 1024 collide, where the ROM goes on to
+  $8418).
 - **MAME** (label `mame`): `mame_rom_map`, `mame_capture` (video RAM and
   palette decoding against MAME snapshots), `mame_images` (the blitter
   against MAME's, per image and mode); later per-frame RAM traces of
@@ -242,7 +263,7 @@ named; `game` checks each (section 3).
 | E2 | Polish: HD presets drawing upscaled sprites from the board's blit list, settings persistence, web build with IndexedDB CMOS, device testing | Device checklist |
 | P2-P5 | (superseded: the PRNG and kernel notes became S0's start) The first plan for a C game, from MAME alone | - |
 | X1 | Extractor (`joust --extract`, as Defender's `src/assets/extract.c`): the images (the catalogue, decoded through the blitter), fonts, palette and sounds (WAVs recorded from the emulated sound board) to `assets/`, then the game's tables as the C game needs them | `extract`; the C game runs from `assets/` alone |
-| S0 | (started 2026-10-21) The C game's foundation: a model of all of RAM (`sim/game.c`), the task kernel (`sim/tasks.c`), the `game` harness; first tasks: the ROM check (`checksum.c`), the lava (`lava.c`) | `game` |
+| S0 | (started 2026-10-21) The C game's foundation: a model of all of RAM (`sim/game.c`), the task kernel (`sim/tasks.c`), the `game` and `routines` harnesses; first tasks: the ROM check (`checksum.c`), the lava (`lava.c`), the collision walks and tests (`collide.c`) | `game`, `routines` |
 | S1 | Task steps in C: the players (flap, gravity, running, braking, the joust's outcome), enemies (Bounders, Hunters, Shadow Lords), eggs and hatching, the pterodactyl, the troll's hand, platforms, waves and their tables, scoring, extra lives, two players | `game` on scripted games (and a second, longer one), `routines` |
 | I1 | The interrupt in C: the display lists to the blitter (the C game draws with `gfx/williams.c`'s blitter into video RAM laid out as the arcade's), the random stir, the controls and coins | Each routine checked per call (as Defender's) |
 | F1 | The frame in C (both passes, the sound queue, the layers) and `--c-game`: the C game alone, from power-on | `frame`: the C game against the board every frame |

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "sim/checksum.h"
+#include "sim/collide.h"
 #include "sim/lava.h"
 #include "sim/prng.h"
 #include "sim/tasks.h"
@@ -79,7 +80,7 @@ void game_sound(Game *g, uint16_t script)
 int game_step_ported(const Game *g, uint16_t task)
 {
     uint16_t at = game_word(g, (uint16_t)(task + TASK_RESUME));
-    return checksum_ported(at) || lava_ported(at);
+    return checksum_ported(at) || lava_ported(at) || collide_ported(at);
 }
 
 StepResult game_step(Game *g, uint16_t task)
@@ -87,5 +88,6 @@ StepResult game_step(Game *g, uint16_t task)
     uint16_t at = game_word(g, (uint16_t)(task + TASK_RESUME));
     if (checksum_ported(at)) return checksum_step(g, task, at);
     if (lava_ported(at)) return lava_step(g, task, at);
+    if (collide_ported(at)) return collide_step(g, task, at);
     return STEP_UNPORTED;
 }

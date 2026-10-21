@@ -92,7 +92,9 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   step in C), `tasks.c` (the task kernel: create, sleep, end, kill by
   type), `prng.c` (the random generator, $E4C0, and the IRQ's stir),
   `checksum.c` (the ROM check task, $ECF8), `lava.c` (the lava's surface
-  and bubbles, $E4E6); each mirrors a ROM routine's arithmetic exactly
+  and bubbles, $E4E6), `collide.c` (the collision walks $837F/$83A4, the
+  pair test $83D8 and the data test $DC21; a collision's handlers not yet);
+  each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
 - `web/` - page shell for the Emscripten build
@@ -139,6 +141,11 @@ Every change keeps `ctest` green.
   ported by resume address: the to-do list. Port a task's steps with the
   stores in the ROM's order (the interleaved replay depends on it), and
   check a new port by planting a bug: the test must catch it.
+- `routines` - label `rom`: ROM routines run on the emulated CPU (direct page
+  $A0, interrupts masked) from chosen RAM and registers until they return,
+  against the C ones on the same RAM: $DC21 and $83D8 on 20000 random cases
+  each. Use it where scripted play rarely reaches a path; aim cases at the
+  edges. `TRACE=1` prints the ROM's path for the first cases.
 - `mame_emu` - label `mame`: the emulated board from power-on with the primed
   CMOS and the probes' script: all 20000 random-state changes in MAME's order
   and frames 1500/1650/1800 pixel for pixel. Inputs a probe sets in a frame
