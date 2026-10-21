@@ -52,6 +52,7 @@ add_library(joust_core STATIC
   src/sim/scores.c
   src/sim/flow.c
   src/sim/display.c
+  src/sim/rider.c
   src/emu/m6809.c
   src/emu/pia6821.c
   src/emu/board.c

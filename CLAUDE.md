@@ -98,7 +98,9 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   `flow.c` (the start buttons' task $6364 and a countdown $62AD, their
   frequent paths); the model also keeps the controls, PIA 0's $C807 and
   its multiplexer (`game_controls`, $6BA6), `display.c` (the display
-  list's nodes, $E2A1-$E38C);
+  list's nodes, $E2A1-$E38C), `rider.c` (the riders: the players' steps
+  in the air, $8F04/$8F3D, with their controls, flap, motion, frame and
+  nodes);
   each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
@@ -143,7 +145,8 @@ Every change keeps `ctest` green.
   before or all after it, or replayed where they fell among its writes; a
   race the C game cannot have is counted and must stay under 1 in 1000.
   The stack page $BE00-$BEFF is not compared. It prints the steps not
-  ported by resume address: the to-do list. Port a task's steps with the
+  ported by resume address (the to-do list) and, for ported ones, how
+  many ran all the way in C (matched/run). Port a task's steps with the
   stores in the ROM's order (the interleaved replay depends on it), and
   check a new port by planting a bug: the test must catch it.
 - `routines` - label `rom`: ROM routines run on the emulated CPU (direct page

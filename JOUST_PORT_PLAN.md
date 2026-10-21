@@ -242,13 +242,34 @@ named; `game` checks each (section 3).
   helpers); a countdown ($62AD: +D-E frames, <$11 counted up each, then
   +$10 frames more watching both players' controls, reset to $3C while
   player 1 holds right and player 2 left; its end at $62CE not ported).
+- **Riders** (`sim/rider.c`): a task each; type $89 player 1, $8F the
+  enemies, $0F/$09 riders the collision walks skip. The block: +7-8 x,
+  +A-B the line (8.8), +D a table in ROM ($88EE player 1's, $8981-$89E3
+  the enemies'), +F facing ($FF left), +$11-12 vertical velocity, +$13
+  frames since a flap, +$14 the speed index (-8..8), +$15 a flap's frames,
+  +$16 x's fraction, +$17 the frame, +$18/+$1A frame tables (+$1A the
+  rider, 0 none), +$1C/+$1E the pictures, +$20 the run animation, +$22 a
+  push, +$23 the ceiling hit, +$24 the brain ($DDB2/$DDB9 the players'
+  controls: CB2 set, $C804 read, <$32 the direction -1/0/1 and <$33 the
+  flap; an enemy's is a coroutine address in $7A83-$80A5), +$26-29 the box,
+  +$30 the motion ($D858 in the air). In the air ($8F04 flapping, $8F3D
+  gliding): $D83D (brain, facing, +$13 counted to $FF, erase nodes $8E8E),
+  a new flap $D813 (lift ((+$13 x $60) >> 8) - $60, the direction twice
+  into the speed index, clamped to ±8), $D858 (gravity <$48 into the
+  velocity, the 8.8 line, a bounce under line $20, x by the speed table at
+  $DCD5 with the fraction, $DDD2: a push spent 3 a frame, x wrapping at
+  $124 and -10), $8E05 (frame $48 or $60, box, pictures), $D9A3 (the
+  platform maps: RAM $B002 + x against ROM $EA97 + line, then $AEA2 + x
+  against $E837 + line; neither: keep flying), $8E4D (draw nodes), a sleep
+  of [[+D]+$1A] frames. Ported for the players in the air; landing
+  ($8F87), the lava ($D899), $D9C2's platform classes, $DA3E and the
+  enemies' brains not yet.
 - The scripted game (`game`) runs 79 task addresses; ported so far: the
-  ROM check, the lava, the collision walks, the scores and the flow's
-  frequent paths (18035 of 32206 steps). The most frequent left: $8F3D
-  and $8F04 (a rider's step: the controls at $D83D, then `[$30,U]`, $8E05
-  (the frame: +$17, the box +$27-$29, the pictures +$1C/+$1E from +$18 and
-  +$1A), $8E4D (their nodes, through $E02A), $D9A3), $65AE (<$4B's bits,
-  drawing through $65EE), $8D4D.
+  ROM check, the lava, the collision walks, the scores, the flow's
+  frequent paths and the players in the air (26478 of 32206 steps run in
+  ported tasks, 21589 all the way in C). The most frequent left: the
+  enemies' brains ($8F3D/$8F04 with types $8F), $65AE (<$4B's bits,
+  drawing through $65EE), $8D4D (on the ground), $6D91, $7619.
 
 ## 3. Test plan
 

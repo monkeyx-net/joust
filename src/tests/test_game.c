@@ -67,7 +67,7 @@ static uint8_t predicted[GAME_RAM], has_prediction[GAME_RAM], written[GAME_RAM],
 static int predicted_mux;
 static int step_active, step_interrupted;
 static long steps, steps_unported, steps_matched, steps_reordered, steps_raced, frame_checks;
-static struct { uint16_t at; long n, ported; } by_resume[128];
+static struct { uint16_t at; long n, ported, matched; } by_resume[128];
 
 static void load_model(void)
 {
@@ -246,6 +246,8 @@ static void end_step(void)
     if (diff == -1) diff = first_difference_of(&model);
     if (diff == -1) {
         steps_matched++;
+        for (int i = 0; i < 128 && by_resume[i].n; i++)
+            if (by_resume[i].at == step_at) by_resume[i].matched++;
     } else if (step_interrupted && matches_reordered()) {
         steps_reordered++;
     } else if (step_interrupted && diff >= 0 && irq_touched_difference()) {
@@ -376,6 +378,9 @@ int main(int argc, char **argv)
         ported += by_resume[i].ported;
         if (!by_resume[i].ported) printf(" $%04X %ld", by_resume[i].at, by_resume[i].n);
     }
+    printf("\ntest_game: ported, by where they resume (matched/run):");
+    for (int i = 0; i < 128 && by_resume[i].n; i++)
+        if (by_resume[i].ported) printf(" $%04X %ld/%ld", by_resume[i].at, by_resume[i].matched, by_resume[i].n);
     printf("\ntest_game: %ld of %ld task steps ported\n", ported, all);
     if (steps_matched < 100) {
         fprintf(stderr, "test_game: too few steps matched\n");
