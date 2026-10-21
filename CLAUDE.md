@@ -96,11 +96,11 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   pair test $83D8 and the data test $DC21; a collision's handlers not yet),
   `scores.c` (the score digits, $E785; blitted with `game_blit`),
   `flow.c` (the start buttons' task $6364 and a countdown $62AD, their
-  frequent paths); the model also keeps the controls, PIA 0's $C807 and
+  frequent paths; the secret code $6B25); the model also keeps the controls, PIA 0's $C807 and
   its multiplexer (`game_controls`, $6BA6), `display.c` (the display
   list's nodes, $E2A1-$E38C), `rider.c` (the riders: in the air,
   $8F04/$8F3D, landing, on the ground, $8D4D, taking off and falling off;
-  the players' brains and $EEC2's), `brains.c` (the enemies' brains,
+  the players' brains and $EEC2's), `wave.c` (the wave manager's frequent path, $6D91), `brains.c` (the enemies' brains,
   $7A83-$80D5: state machines as basic blocks by ROM address; $80D6 the
   target), `platform.c` (landing on a platform, bouncing off one, $D9A3);
   each mirrors a ROM routine's arithmetic exactly

@@ -3,7 +3,8 @@
  *   test_game <joust.zip|folder> [runner|two]
  * Plays a scripted game on the board (a coin, a start, then player 1
  * running and flapping; `runner`: 12000 frames of mostly running on the
- * ground, a flap now and then, then idle to the game's end; `two`: two
+ * ground, a flap now and then, then idle to the game's end, and in the
+ * game the secret code ($6B25) at frame 5000; `two`: two
  * coins, a 2-player start, both players playing, 9000 frames) while a C
  * model of all of RAM (sim/game.h) follows it:
  *   - every write the board makes (the CPU's and the blitter's) is copied
@@ -358,7 +359,20 @@ static void controls(long f)
     board.in0 = f >= 1300 && f < 1315 ? IN0_START1 : 0;
     if (f <= 1400) return;
     if (runner) {
-        if (f < 8000)
+        /* the secret code ($6B25), in the game */
+        if (f >= 5000 && f < 5040) {
+            board.in0 = IN0_START1;
+            board.inp1 = INP_LEFT | INP_FLAP;
+            board.inp2 = INP_RIGHT;
+        } else if (f >= 5040 && f < 5080) {
+            board.in0 = IN0_START2;
+            board.inp1 = INP_RIGHT;
+            board.inp2 = INP_FLAP;
+        } else if (f >= 5080 && f < 5120) {
+            board.inp1 = INP_LEFT | INP_FLAP;
+            board.inp2 = INP_RIGHT | INP_FLAP;
+        }
+        if (f < 8000 && (f < 5000 || f >= 5120))
             board.inp1 = (uint8_t)((f % 300 < 140 ? INP_RIGHT : f % 300 < 150 ? 0 : f % 300 < 290 ? INP_LEFT : 0) |
                                    (f % 200 == 0 ? INP_FLAP : 0));
         return;

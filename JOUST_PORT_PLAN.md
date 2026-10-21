@@ -284,6 +284,21 @@ named; `game` checks each (section 3).
   the screen's side, where it sleeps 60 frames in the brain (the task
   resumes at $EF08: not ported). The lava ($D899) and the enemies' other
   brains are not ported yet.
+- **The wave** (`sim/wave.c`, its manager's frequent path): $6D91 every 8
+  frames while enemies are left (<$AA): <$AC frames held, then <$AD-AE
+  counted down to the pterodactyl ($68A8, at most 3 a wave by <$AB; not
+  ported; the next wait from $6DE2 by +$1B); while <$A1 is set, every $70
+  looks (+B) one more brain may run at once (<$8F up, kept from wrapping,
+  when <$90). No enemies left: the wave's end ($6BDC, not ported).
+- **A secret code** ($6B20-$6BA5, in `sim/flow.c`): during a game a task
+  watches both players' controls ($6BA6) for $2502, then $1204, then
+  $0506 (player 1 left+flap with start 1 and player 2 right; start 2 with
+  player 1 right and player 2 flap; player 1 left+flap and player 2
+  right+flap), each held until it changes, the next looked for 15 frames
+  later; a wrong one starts over after 30 frames. $6B90 keeps the wanted
+  controls in +D and the continuation in +F, looking every frame at
+  $6B9B. At the end ($6B4C, not ported) a message, then `JMP [$FFFE]`:
+  the machine restarts. `game_runner` enters it at frame 5000.
 - **The enemies' brains** ($7A83-$80D5, `sim/brains.c`): state machines,
   the state's address at +$24; each state sets <$32-<$33 and usually the
   next state, and returns. Three families ($7A83 on, $7C95 on, $7ECF on),

@@ -14,6 +14,11 @@
 #define COMBO 0x62DF
 #define TURN_TAKE 0x8B0E
 #define TURN_WAIT 0x8B1A
+#define CODE_RETRY 0x6B20
+#define CODE_1 0x6B25
+#define CODE_2 0x6B35
+#define CODE_3 0x6B45
+#define CODE_LOOK 0x6B9B
 
 int flow_ported(uint16_t at)
 {
@@ -25,7 +30,12 @@ int flow_ported(uint16_t at)
     case COMBO_START:
     case COMBO:
     case TURN_TAKE:
-    case TURN_WAIT: return 1;
+    case TURN_WAIT:
+    case CODE_RETRY:
+    case CODE_1:
+    case CODE_2:
+    case CODE_3:
+    case CODE_LOOK: return 1;
     }
     return 0;
 }
@@ -57,6 +67,29 @@ static StepResult countdown(Game *g, uint16_t u)
     return STEP_UNPORTED; /* $62CE */
 }
 
+/* $6B90: wait for the controls `want`, carrying on at `then` */
+static StepResult code_wait(Game *g, uint16_t u, uint16_t want, uint16_t then)
+{
+    game_set_word(g, (uint16_t)(u + 0xD), want);
+    game_set_word(g, (uint16_t)(u + 0xF), then);
+    return task_sleep(g, 1, CODE_LOOK);
+}
+
+/* $6B9B: the controls against +D, on to the continuation at +F */
+static StepResult code_look(Game *g, uint16_t u)
+{
+    uint16_t want = game_word(g, (uint16_t)(u + 0xD));
+    int same = game_controls(g) == want;
+    switch (game_word(g, (uint16_t)(u + 0xF))) {
+    case 0x6B2A: return same ? code_wait(g, u, want, 0x6B2E) : task_sleep(g, 30, CODE_1);
+    case 0x6B2E: return same ? code_wait(g, u, want, 0x6B2E) : task_sleep(g, 15, CODE_2);
+    case 0x6B3A: return same ? code_wait(g, u, want, 0x6B3E) : task_sleep(g, 30, CODE_1);
+    case 0x6B3E: return same ? code_wait(g, u, want, 0x6B3E) : task_sleep(g, 15, CODE_3);
+    case 0x6B4A: return same ? STEP_UNPORTED /* $6B4C: the message */ : code_wait(g, u, want, 0x6B2E);
+    }
+    return STEP_UNPORTED;
+}
+
 StepResult flow_step(Game *g, uint16_t u, uint16_t at)
 {
     switch (at) {
@@ -72,6 +105,11 @@ StepResult flow_step(Game *g, uint16_t u, uint16_t at)
     case COMBO:
         if (game_controls(g) == 0x0201) return STEP_UNPORTED; /* $626B */
         return task_sleep(g, 5, COMBO);
+    case CODE_RETRY: return task_sleep(g, 30, CODE_1);
+    case CODE_1: return code_wait(g, u, 0x2502, 0x6B2A);
+    case CODE_2: return code_wait(g, u, 0x1204, 0x6B3A);
+    case CODE_3: return code_wait(g, u, 0x0506, 0x6B4A);
+    case CODE_LOOK: return code_look(g, u);
     case TURN_TAKE:
         game_poke(g, (uint16_t)(u + 0x16), game_peek(g, 0xA03A));
         game_poke(g, 0xA03A, (uint8_t)(game_peek(g, 0xA03A) + 1));

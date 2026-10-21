@@ -11,7 +11,11 @@
  * and player 2 left together: $626B, not ported) and $8B0E/$8B1A (a rider
  * waiting for its turn to appear: $8B0E takes a number, <$3A, into +$16;
  * $8B1A waits for <$38 = <$39 and its number in <$3B; then $8B2D, not
- * ported; type 9 goes to $8ABA, not ported).
+ * ported; type 9 goes to $8ABA, not ported), and a secret code
+ * ($6B20-$6BA5): both players' controls must show $2502, then $1204,
+ * then $0506 ($6B90 keeps the wanted controls in +D and where to carry on
+ * in +F, and looks every frame at $6B9B); a wrong position starts over
+ * after 30 frames; the message at the end ($6B4C) is not ported.
  */
 #ifndef JOUST_FLOW_H
 #define JOUST_FLOW_H
