@@ -33,5 +33,15 @@ StepResult rider_step(Game *g, uint16_t task, uint16_t at);
 void rider_frame(Game *g, uint16_t u, uint8_t frame);
 /* $DDD2: x moved by dx, with the push at +$22 and the screen's wrap */
 void rider_move_x(Game *g, uint16_t u, uint8_t dx);
+/* $8E8E (chain 0: erase) / $8E4D (chain 1: draw): the pictures' nodes;
+   returns the last node filled (the mount's), 0 if none */
+uint16_t rider_pictures(Game *g, uint16_t u, int chain);
+/* the brain at +$24: 0 its controls in <$32-<$33, 1 it ended the step
+   (*slept), -1 a brain not ported */
+int rider_brain(Game *g, uint16_t u, StepResult *slept);
+/* $8DF9: the standing box (13 lines) and the pictures for the frame */
+void rider_stand_box(Game *g, uint16_t u);
+/* $8D50: on the ground with the controls in <$32-<$33 */
+StepResult rider_ground_on(Game *g, uint16_t u);
 
 #endif

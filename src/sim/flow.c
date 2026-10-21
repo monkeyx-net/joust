@@ -1,5 +1,6 @@
 #include "sim/flow.h"
 
+#include "sim/spawn.h"
 #include "sim/tasks.h"
 
 #define STARTS_BEGIN 0x6359
@@ -118,7 +119,7 @@ StepResult flow_step(Game *g, uint16_t u, uint16_t at)
         uint8_t b = game_peek(g, (uint16_t)(u + 0x16));
         if (game_peek(g, (uint16_t)(u + 2)) == 0x09) return STEP_UNPORTED; /* $8ABA */
         if (game_peek(g, 0xA038) != game_peek(g, 0xA039) || b != game_peek(g, 0xA03B)) return task_sleep(g, 1, TURN_WAIT);
-        return STEP_UNPORTED; /* $8B2D */
+        return spawn_choose(g, u, 0x883E); /* $8B2D */
     }
     }
     return STEP_UNPORTED;

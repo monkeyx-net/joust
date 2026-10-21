@@ -73,20 +73,24 @@ move:;
     game_set_word(g, field(u, 7), (uint16_t)x);
 }
 
-/* $8E8E (erase: chain 0) and $8E4D (draw: chain 1): the pictures' nodes */
-static void pictures(Game *g, uint16_t u, int chain)
+uint16_t rider_pictures(Game *g, uint16_t u, int chain)
 {
     uint16_t rider = game_word(g, field(u, 0x1E)), mount = game_word(g, field(u, 0x1C));
     if (rider) {
         uint16_t node = display_object(g, u, chain, 2);
         display_fill(g, node, rider);
         display_fill(g, (uint16_t)(node + 10), mount);
-    } else if (mount) {
-        display_fill(g, display_object(g, u, chain, 1), mount);
+        return (uint16_t)(node + 10);
     }
+    if (mount) {
+        uint16_t node = display_object(g, u, chain, 1);
+        display_fill(g, node, mount);
+        return node;
+    }
+    return 0;
 }
 
-static void pictures(Game *g, uint16_t u, int chain);
+static void pictures(Game *g, uint16_t u, int chain) { (void)rider_pictures(g, u, chain); }
 
 /* $EEF2: the brain's direction (the facing) and flap to <$32-<$33 */
 static void ahead(Game *g, uint16_t u, uint8_t flap)
@@ -99,7 +103,7 @@ static void ahead(Game *g, uint16_t u, uint8_t flap)
    (asleep), -1 a brain not ported */
 enum { BRAIN_SET = 0, BRAIN_SLEPT = 1, BRAIN_UNPORTED = -1 };
 
-static int brain(Game *g, uint16_t u, StepResult *slept)
+int rider_brain(Game *g, uint16_t u, StepResult *slept)
 {
     uint16_t b = game_word(g, field(u, 0x24));
     switch (b) {
@@ -135,7 +139,7 @@ static int brain(Game *g, uint16_t u, StepResult *slept)
 /* $D83D: the brain, the facing, frames since a flap, the erase nodes; as brain() */
 static int think(Game *g, uint16_t u, StepResult *slept)
 {
-    int r = brain(g, u, slept);
+    int r = rider_brain(g, u, slept);
     if (r != BRAIN_SET) return r;
     uint8_t dir = game_peek(g, CONTROLS);
     if (dir) {
@@ -224,13 +228,18 @@ static StepResult rest(Game *g, uint16_t u, uint16_t resume)
     return task_sleep(g, game_read(g, game_read_word(g, (uint16_t)(game_word(g, field(u, 0xD)) + 0x1A))), resume);
 }
 
-/* $8DEF: standing: the box (13 lines), the pictures, the rest */
-static StepResult standing(Game *g, uint16_t u)
+void rider_stand_box(Game *g, uint16_t u)
 {
     uint8_t b = game_peek(g, field(u, 0xB));
     game_poke(g, field(u, 0x27), b);
     game_poke(g, field(u, 0x28), (uint8_t)(b - 0x13));
     frame_tail(g, u);
+}
+
+/* $8DEF: standing: the box (13 lines), the pictures, the rest */
+static StepResult standing(Game *g, uint16_t u)
+{
+    rider_stand_box(g, u);
     pictures(g, u, 1);
     return rest(g, u, RIDER_STANDING);
 }
@@ -376,9 +385,14 @@ static int run_frame(Game *g, uint16_t u, uint16_t routine, uint16_t *d)
 static StepResult ground(Game *g, uint16_t u)
 {
     StepResult slept = STEP_DONE;
-    int r = brain(g, u, &slept);
+    int r = rider_brain(g, u, &slept);
     if (r == BRAIN_SLEPT) return slept;
     if (r != BRAIN_SET) return STEP_UNPORTED;
+    return rider_ground_on(g, u);
+}
+
+StepResult rider_ground_on(Game *g, uint16_t u)
+{
     uint8_t dir = game_peek(g, CONTROLS), flap = game_peek(g, CONTROLS + 1);
     if (!game_peek(g, field(u, 0x13)) && flap) return take_off(g, u);
     game_poke(g, field(u, 0x13), flap);

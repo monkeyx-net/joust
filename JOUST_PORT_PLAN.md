@@ -290,6 +290,28 @@ named; `game` checks each (section 3).
   ported; the next wait from $6DE2 by +$1B); while <$A1 is set, every $70
   looks (+B) one more brain may run at once (<$8F up, kept from wrapping,
   when <$90). No enemies left: the wave's end ($6BDC, not ported).
+- **The spawn** (`sim/spawn.c`, $87B0-$883D, $8B2D-$8D22): four pads, the
+  records at $8A5D-$8A75 (8 bytes: [a word holding the pad's node
+  template's address][x][line][its use count, <$6E-<$71]). $87B0: the use
+  counts to <$6A-<$6D, then every rider (type bit 7; $82 only with +$2B
+  set) whose x some frames ahead (the table at the given table's first
+  word by its speed index, wrapped) lies in a pad's zone for its line (the
+  7-byte zones after it: [outside?][low][high][the pad's flag]) marks that
+  pad busy. $8B2D: two random bits pick a pad, the next free one taken in
+  turn (none: a frame's wait at $8B15); its count up, the rider on it
+  (+$20 the record), <$39 or <$3B up (type 9 or not), the table's +$2C
+  sound, +$10 = $1E frames, +$1A the rider's frames ([[+D]+$A]). Each
+  frame ($8BAF) the pad ($65EE: a fixed picture's node on chain +6 from
+  its template) in the solid colour of the table's +$2E; from frame $14
+  the rider's nodes grown down in that colour ($8BCB-$8C15) and ($8C1C)
+  the mount's node a solid erase down the pad's column. On the pad ($8C56)
+  the brain; the rows shimmer through the colours at the table's +$C
+  ($8CA5; +$26 the colour, +$15 its pace, +$16 set once +$35 runs low)
+  until the controls move it (the table's +$2A sound) or +$35 halves to
+  0; then the pad plain again, its count down, the table's +$14 routine
+  (players: $8267 sets <$73 or <$75 and <$A8/<$A9 from <$A7; enemies'
+  $8A7D returns), and onto the ground ($8CF1, then $8D50). The attract
+  mode's demo rider (type 9, brain $61DA) is not ported.
 - **Eggs** (`sim/eggs.c`): an egg's task in flight ($7611 drawn, $7619
   every <$B0 frames: erased ($6AF3), moved ($75B0: gravity <$48, the
   ceiling under line $20, x by the speed table and $DDD2, then wrapped at
