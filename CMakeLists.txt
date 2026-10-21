@@ -44,6 +44,10 @@ add_library(joust_core STATIC
   src/gfx/debugfont.c
   src/gfx/williams.c
   src/sim/prng.c
+  src/sim/game.c
+  src/sim/tasks.c
+  src/sim/checksum.c
+  src/sim/lava.c
   src/emu/m6809.c
   src/emu/pia6821.c
   src/emu/board.c
@@ -133,6 +137,10 @@ if(EXISTS "${JOUST_ROM}")
   target_link_libraries(test_rom PRIVATE joust_core)
   add_test(NAME rom_load COMMAND test_rom "${JOUST_ROM}" "${CMAKE_BINARY_DIR}/rom_test")
   set_tests_properties(rom_load PROPERTIES LABELS rom)
+  add_executable(test_game src/tests/test_game.c)
+  target_link_libraries(test_game PRIVATE joust_core)
+  add_test(NAME game COMMAND test_game "${JOUST_ROM}")
+  set_tests_properties(game PROPERTIES LABELS rom TIMEOUT 600)
   message(STATUS "ROM set found at ${JOUST_ROM}: ROM tests enabled")
 else()
   message(STATUS "No ROM set at ${JOUST_ROM}: ROM tests disabled (put joust.zip in roms/)")

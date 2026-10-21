@@ -215,7 +215,7 @@ int rom_images_decode(const RomSet *rom, ImageSheet *out)
 
     /* each image through the blitter, as the game draws it, into scratch RAM */
     static uint8_t ram[WILLIAMS_VRAM_SIZE];
-    WilliamsBus bus = { ram, rom, 1 };
+    WilliamsBus bus = { ram, rom, 1, NULL, NULL };
     for (int i = 0; i < ROM_IMAGE_COUNT; i++) {
         const RomImage *im = &ROM_IMAGES[i];
         memset(ram, 0, sizeof ram);

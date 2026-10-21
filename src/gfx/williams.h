@@ -35,6 +35,9 @@ typedef struct {
     uint8_t *ram;        /* WILLIAMS_VRAM_SIZE bytes */
     const RomSet *rom;
     int romsel;          /* $C900 bit 0 */
+    /* optional: told of each byte the blitter writes, before it lands (tests) */
+    void (*on_write)(void *ctx, unsigned addr, uint8_t value);
+    void *ctx;
 } WilliamsBus;
 
 /* One blit as a write to $CA00 starts it: registers as the game writes them

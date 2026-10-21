@@ -68,9 +68,16 @@ static uint8_t bus_read(void *ctx, uint16_t a)
     return 0xFF; /* palette (write-only), unmapped */
 }
 
+/* The blitter's writes, for a write hook (tests follow RAM through it). */
+static void blit_wrote(void *ctx, unsigned addr, uint8_t value)
+{
+    Board *b = ctx;
+    b->write_hook(b, (uint16_t)addr, value);
+}
+
 static void blit_start(Board *b, uint8_t ctrl)
 {
-    WilliamsBus bus = { b->ram, b->rom, b->romsel & 1 };
+    WilliamsBus bus = { b->ram, b->rom, b->romsel & 1, b->write_hook ? blit_wrote : NULL, b };
     beam_catch_up(b);
     uint16_t src = (uint16_t)(b->blit[2] << 8 | b->blit[3]), dst = (uint16_t)(b->blit[4] << 8 | b->blit[5]);
     williams_blit(&bus, ctrl, b->blit[1], src, dst, b->blit[6], b->blit[7]);

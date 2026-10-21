@@ -71,7 +71,8 @@ struct Board {
     Framebuffer *fb;         /* during board_run_frame: where lines are drawn, or NULL */
     int next_line, next_drawn;
     int64_t next_line_start;
-    /* optional: called on every CPU write (tests trace RAM through this) */
+    /* optional: called on every write to the bus, the CPU's and the
+       blitter's (tests trace RAM through this) */
     void (*write_hook)(Board *b, uint16_t addr, uint8_t value);
     /* optional: called at the start of each line (scripted input timing) */
     void (*line_hook)(Board *b, int line);

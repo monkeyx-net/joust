@@ -64,6 +64,7 @@ static void blit_pixel(WilliamsBus *bus, unsigned dst, uint8_t src, uint8_t ctrl
     }
     cur &= keep;
     cur |= (ctrl & BLIT_SOLID ? solid : src) & (uint8_t)~keep;
+    if (bus->on_write) bus->on_write(bus->ctx, dst, cur);
     bus->ram[dst] = cur;
 }
 

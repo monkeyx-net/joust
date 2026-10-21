@@ -3,15 +3,24 @@
 A C11 / SDL2 rebuild of Joust (Williams, 1982) that plays like the arcade
 game, for PortMaster handhelds (aarch64), desktops (x86_64 Linux, Windows) and
 the web. Unlike the sibling Robotron port, there is no remake to port from:
-the ROM, running in MAME, is the only reference.
+the ROM, running in MAME, is the only reference. Today the game is the
+player's ROM running on an emulated board. The goal (decision 6, changed
+2026-10-21) is the game rewritten in C, as the Defender port's is
+(`../defender`, its plan and CLAUDE.md), reading only assets extracted once
+from the ROM set, with the emulated board as its reference.
 
 ## 1. Decisions (2026-10-20)
 
-1. **No ROM-derived data in the repo, the packages or the binary.** Sprites,
-   fonts, tables and sounds all come from the player's own ROM set: read at
-   run time, or extracted to `assets/` on first run. CI and releases carry
-   none. (Robotron ships sprites and sounds from its web remake; Joust has no
-   such source, and this keeps the project clean.)
+1. **The ROM set is read once** (changed 2026-10-21, as Defender's decision
+   1). The binary never embeds ROM-derived data; it loads it at run time
+   from an `assets/` folder. On first run, if `assets/` is missing,
+   `joust --extract <joust.zip>` (also run by the launcher when it finds
+   the zip in the port folder) writes the graphics, fonts, tables and sound
+   data there from the player's own ROM set; after that the ROM set is no
+   longer needed. The repo, CI and releases still carry no ROM-derived data
+   (the extractor's tables name ROM addresses only). This only pays off
+   with the game written in C (decision 6): while the emulated board runs
+   the ROM's code, it still reads the ROM set. The extractor is phase X1.
 2. **MAME is the reference.** Behaviour is established by probing the ROM in
    MAME 0.289 (RAM dumps, per-frame traces with scripted input) and checked
    by CTest against the port. Probes are Lua and only dump; C or CMake compares.
@@ -25,14 +34,19 @@ the ROM, running in MAME, is the only reference.
    1 s = exit (as Robotron). Keyboard: P1 arrows + Space/Ctrl, P2 A/D + W.
 5. **Enhanced graphics** as in the Robotron port (FILTER and HD presets,
    glow, scanlines), cosmetic only, classic by default.
-6. **Run the ROM's code** (2026-10-20, replacing the rewrite of P2-P5): the
-   game is the player's ROM running on an emulated board (`src/emu/`: a 6809,
-   the Williams main board with PIAs, interrupts, blitter and CMOS, and the
-   sound board's 6800 and DAC), written in C for this port (no MAME code).
-   The port supplies the platform layer, enhanced graphics, input, saving and
-   packaging. MAME stays the reference: `mame_emu` checks the board against
-   it. Decision 1 still holds: the program contains no ROM data. The P2 notes
-   below remain useful for later work (e.g. HD sprites from the blit list).
+6. **The game in C** (changed 2026-10-21, as Defender's decision 6; it
+   replaces running the ROM's code for good, decided 2026-10-20). The game
+   logic is rewritten in C (`src/sim/`), routine by routine, each mirroring
+   a ROM routine's arithmetic and its order of stores, from the ROM's
+   behaviour (traces, probes, the disassembly MAME writes to `build/re`).
+   The emulated board (`src/emu/`: a 6809, the Williams main board with
+   PIAs, interrupts, blitter and CMOS, and the sound board's 6800 and DAC,
+   checked against MAME by `mame_emu`) stays: it is the reference the C
+   game is compared with, step by step and frame by frame, and it runs the
+   game until the C version reaches parity. It also records the sounds at
+   extraction; the 6808 is not needed at play time once the C game plays
+   the WAVs. The P2 notes below are the start of the C game's reverse
+   engineering.
 
 ## 2. Hardware (Williams first generation)
 
@@ -142,12 +156,72 @@ MAME frames of play with movement (1400-2400) match pixel for pixel:
   before the line starts; a store or blit landing after that waits for it.
 - `Sound.step_hook` traces the sound CPU.
 
+### The game program in C (S0, started 2026-10-21)
+
+Direct page is $A0 throughout, so `<$xx` is $A0xx. Ported routines are
+named; `game` checks each (section 3).
+- **Tasks** (`sim/tasks.c`): 40 blocks of $38 bytes at $A100-$A9BF, linked
+  at power-on ($E091-$E0A3; the last block's link points at $A9C0, the
+  first display list, not 0). The list runs from <$0A (the head, $A00A,
+  sits where a block's link would); free blocks from <$08. A block: +0
+  next, +2 type, +3 a flag that runs it in the second pass, +4 frames to
+  sleep, +5-6 where it resumes, then its own bytes. <$2E the task running,
+  <$2C the block before it, <$66 where the second pass resumes. $E284
+  (via $E030; $E282 via $E009 after the current task) takes a free block,
+  links it after U and sets +4 = 1, +5 = X, +2 = A, +3 = B. $E157 (via
+  $E037) sleeps A frames, resuming after the call; $E20F (via $E00F) ends
+  the current task; $E24D (via $E00C) ends every other task whose type &
+  B equals A, moving <$66 off a block it frees.
+- **The frame loop** ($E0E2): takes this frame's display list ($A9C0 or
+  $AC21 by <$27), waits until the interrupt has drawn it, sends the queued
+  sound when <$61 counts down to 0 (script pointer <$63, priority <$62,
+  to the PIA at $C80E: $FF, then the command & $3F), clears the four layer
+  heads at $A000, $A040, $A080 and $A0C0, then the passes: the first
+  ($E163) counts every unflagged task down and runs those at zero; the
+  second ($E180) the flagged ones from <$66 on, stopping when the byte at
+  [<$68] is 0 (the interrupt has drawn the previous list) and saving its
+  place; then the layers are chained into the new display list ($E197-
+  $E20C).
+- **Sound requests** ($E4CD via $E02D, X = a script): its first byte is
+  the priority; one without bit 7 is dropped unless <$90 has bit 7; one
+  below the queued sound's priority is dropped while it waits.
+- **The ROM check** ($ECF8-$ED17, `sim/checksum.c`): a task adding every
+  other byte of $0000-$7FFF, one a frame (+D-E the pointer, +F the sum),
+  about 4.5 minutes a pass; a pass ending on any sum but $EEC1's byte
+  calls $7A75 (not ported).
+- **The lava** ($E4E6-$E5E6, `sim/lava.c`): at a game's start the surface
+  fills a line every 20 frames, from line $FF up to <$9B (<$9C-<$9D the
+  column and row), $44 pairs drawn in from each side of the screen until
+  they meet something; then bubbles: a random column from the 16 at
+  $E5E9, and by the random carry a bubble ($40, $04/$40, $44 back, 8
+  frames apart, with the sound at $E692) or a dip (cleared, drawn back over
+  three frames). It writes the screen with the ROM unselected (`$BFFF` is
+  RAM's copy of $C900).
+- The scripted game (`game`) runs 79 task addresses; ported so far: the
+  ROM check and the lava (5328 of 32206 steps). The most frequent left:
+  $8F3D, $837F/$83A4, $65AE, $E7A6, $6364, $8F04, $8D4D.
+
 ## 3. Test plan
 
 - **Unit** (`ctest`, no ROM): scalers, presets, blitter, glow (`enhance`);
   the sim's pieces as they arrive.
 - **ROM** (label `rom`): the loader (`rom_load`); later the extractor's
-  output against hashes recorded when it matched MAME.
+  output (as Defender's `extract`).
+- **Task steps** (label `rom`): `game` keeps a C model of all of RAM
+  (`sim/game.h`) on the board's scripted game: the board's writes (the
+  CPU's and the blitter's) are copied to it, except during a ported task
+  step, which runs in C when the ROM's dispatcher starts it ($E154); as the
+  ROM's step writes each byte the model takes the C value, and when it
+  yields ($E15F) the model, and the ROM select, must equal the board's.
+  Steps an interrupt broke into must match with the interrupt's writes
+  before or after the C step, or replayed where they fell among its
+  writes; a race the C game cannot have (the ROM reading partly before the
+  interrupt) is counted and must stay under 1 in 1000. Between steps the
+  model must equal RAM every frame. The stack page $BE00-$BEFF is not
+  compared. A planted bug in either ported task is caught at the byte.
+  Next, as Defender's: `routines` (ROM routines on chosen inputs), checks
+  of the interrupt's routines per call, and `frame` (the C game alone
+  against the board).
 - **MAME** (label `mame`): `mame_rom_map`, `mame_capture` (video RAM and
   palette decoding against MAME snapshots), `mame_images` (the blitter
   against MAME's, per image and mode); later per-frame RAM traces of
@@ -166,8 +240,11 @@ MAME frames of play with movement (1400-2400) match pixel for pixel:
 | P1 | (done 2026-10-20 bar later-wave-only images: video and palette decoding, blitter emulation, 166 named images checked against MAME) Graphics from the ROM: find the image tables (ostriches, buzzards, knights, pterodactyl, eggs, platforms, lava, troll hand, font) and the palette; extractor writes `assets/` at first run | Extracted frames drawn by the port match MAME screenshots of the same scenes |
 | E1 | (done 2026-10-20) Emulated board: 6809 core, main board, sound board; the game plays from the player's ROM with sound | `mame_emu`: 20000 random-state changes and three frames equal MAME's; instruction traces of frames 600-900 matched cycle for cycle |
 | E2 | Polish: HD presets drawing upscaled sprites from the board's blit list, settings persistence, web build with IndexedDB CMOS, device testing | Device checklist |
-| P2 | (superseded by decision 6; PRNG and kernel notes kept) Reverse engineering: RAM map, object lists, PRNG, flap and gravity physics, collisions and joust outcome, wave tables and spawn rules | Lua probes dump each documented variable; notes in this plan |
-| P3 | Sim, wave 1: player, Bounders, eggs and hatching, platforms, scoring, death and respawn, deterministic from scripted input | Per-frame traces equal MAME's for scripted wave-1 games |
-| P4 | Full game: all wave types (egg, survival, gladiator, pterodactyl), Hunters and Shadow Lords, troll hand, lava, crumbling platforms, extra lives, 2 players | Traces match MAME through wave 10 |
-| P5 | Presentation: attract mode, high-score table and entry, operator menu (CMOS settings), sound (6808 + DAC emulation of the sound ROM, or player-side capture) | Device checklist on 3 handhelds + Steam Deck |
+| P2-P5 | (superseded: the PRNG and kernel notes became S0's start) The first plan for a C game, from MAME alone | - |
+| X1 | Extractor (`joust --extract`, as Defender's `src/assets/extract.c`): the images (the catalogue, decoded through the blitter), fonts, palette and sounds (WAVs recorded from the emulated sound board) to `assets/`, then the game's tables as the C game needs them | `extract`; the C game runs from `assets/` alone |
+| S0 | (started 2026-10-21) The C game's foundation: a model of all of RAM (`sim/game.c`), the task kernel (`sim/tasks.c`), the `game` harness; first tasks: the ROM check (`checksum.c`), the lava (`lava.c`) | `game` |
+| S1 | Task steps in C: the players (flap, gravity, running, braking, the joust's outcome), enemies (Bounders, Hunters, Shadow Lords), eggs and hatching, the pterodactyl, the troll's hand, platforms, waves and their tables, scoring, extra lives, two players | `game` on scripted games (and a second, longer one), `routines` |
+| I1 | The interrupt in C: the display lists to the blitter (the C game draws with `gfx/williams.c`'s blitter into video RAM laid out as the arcade's), the random stir, the controls and coins | Each routine checked per call (as Defender's) |
+| F1 | The frame in C (both passes, the sound queue, the layers) and `--c-game`: the C game alone, from power-on | `frame`: the C game against the board every frame |
+| C3 | Attract mode, high-score table and entry, operator pages, sounds from the WAVs; the C game becomes the default, the release needs only `assets/` | Full scripted run matches; release with `assets/` only |
 | P6 | Release: packages, PortMaster submission, GitHub release | Published |
