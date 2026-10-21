@@ -11,9 +11,11 @@
  *     (well formed, and noise for the overflow paths), random offsets;
  *     the carry and where X and Y end must match
  *   - $83D8, a pair's box and data test and its outcome ($8418: who wins,
- *     bounces): random task blocks; it returns with the carry (the walk
- *     goes on or moves to the next pair) or reaches a path not ported
- *     (an unhorsing at $84E0, $7535, the SWI at $8428); all of RAM
+ *     bounces, an unhorsing with its egg and score, an egg collected):
+ *     random task blocks with the riders' real tables, on a game in
+ *     progress; it returns with the carry (the walk goes on or moves to
+ *     the next pair) or reaches a path not ported (a player's death,
+ *     $8279; the SWI at $8428); all of RAM and the CMOS
  *   - the display list's nodes ($E2A1, $E2B8, $E2CF, $E2F9, $E322, $E358,
  *     sim/display.c): random chain tails, free pointer and objects; the
  *     node returned (X) and all of RAM must match
@@ -22,6 +24,9 @@
  *     platform maps), the player's block at random x, line, velocity,
  *     speed and push: landing or flying (the Z flag) and all of RAM; the
  *     cases that start the troll's hand ($DA0E) are skipped
+ *   - $E6A8 and $E6B1, scoring (sim/score.c): player 1's score block with
+ *     random BCD scores, points, extra-life thresholds and intervals
+ *     (sometimes none), lives; all of RAM (the icon's blit too) and CMOS
  *   - $80D6, the enemies' target (sim/brains.c): the two players' blocks
  *     at random lines and x (near each other often, for the ties), or
  *     missing, either out (<$A8, <$A9): found (Z clear) and X
@@ -38,6 +43,7 @@
 #include "sim/display.h"
 #include "sim/game.h"
 #include "sim/platform.h"
+#include "sim/score.h"
 
 #define CASES 20000
 #define RETURN 0x0000      /* where the call returns: stepping stops there */
@@ -67,7 +73,9 @@ static void poke_word(uint16_t a, uint16_t v)
 }
 
 /* where the outcome's unported paths begin */
-static const uint16_t outcome_stops[] = { 0x84E0, 0x7535, 0x8428 };
+static const uint16_t outcome_stops[] = { 0x8279, 0x8428 };
+static uint8_t base[0xC000];      /* RAM of a game in progress (the scripted game's frame 2000) */
+static uint16_t base_player;     /* the player's task block in it */
 static int stop_at_outcomes;
 static int tracing; /* ONLY=n: trace case n of the pair cases */
 static int visited_8487;
@@ -80,6 +88,9 @@ static uint16_t call(uint16_t pc, uint16_t stop)
     board.ram[--board.cpu.s] = RETURN >> 8;
     board.cpu.pc = pc;
     board.cpu.cc |= CC_I | CC_F;
+    board.cpu.waiting = 0; /* (after frames the CPU may sit in a CWAI or SYNC, a line raised) */
+    board.cpu.dp = 0xA0;   /* the game's direct page (a case before may have changed it) */
+    board.cpu.irq = board.cpu.firq = board.cpu.nmi = 0;
     for (long n = 0; n < 200000; n++) {
         if (board.cpu.pc == RETURN || (stop && board.cpu.pc == stop)) return board.cpu.pc;
         if (stop_at_outcomes)
@@ -109,7 +120,12 @@ static void random_list(uint16_t at)
     poke_word((uint16_t)(at + rows * 4 + 2), 0xFFFF);
 }
 
-static void sync_model(void) { game_load(&model, board.ram, board.romsel); }
+static void sync_model(void)
+{
+    board.romsel = 1; /* as the game's tasks run (a case before may have changed it) */
+    game_load(&model, board.ram, board.romsel);
+    memcpy(model.cmos, board.cmos, sizeof model.cmos);
+}
 
 static long first_difference(void)
 {
@@ -145,7 +161,9 @@ static void rows_cases(void)
 
 static void random_task(uint16_t t, uint16_t list)
 {
+    static const uint16_t tables[] = { 0x88EE, 0x8981, 0x89B2, 0x89E3 };
     for (int i = 0; i < 0x38; i++) board.ram[t + i] = (uint8_t)rnd();
+    poke_word((uint16_t)(t + 0xD), tables[rnd() % 4]);
     int x = (int)(rnd() % 300), w = 4 + (int)(rnd() % 12);
     poke_word((uint16_t)(t + 7), (uint16_t)x);
     poke_word((uint16_t)(t + 0x29), (uint16_t)(x + w));
@@ -159,14 +177,21 @@ static void random_task(uint16_t t, uint16_t list)
 
 static void pair_cases(void)
 {
-    long bounces = 0, unported = 0, met = 0;
+    long bounces = 0, unported = 0, met = 0, unhorsed = 0, eggs = 0;
     stop_at_outcomes = 1;
     for (int i = 0; i < (getenv("TRACE") ? 2 : CASES); i++) {
+        memcpy(board.ram, base, sizeof base);
         random_task(TASK_U, LIST_X);
         random_task(TASK_X, LIST_Y);
         if (rnd() % 2) { /* overlap the boxes more often */
             memcpy(board.ram + TASK_X + 7, board.ram + TASK_U + 7, 2);
             board.ram[TASK_X + 0x27] = board.ram[TASK_U + 0x27];
+        }
+        if (board.ram[TASK_U + 0xD] != 0x88 || board.ram[TASK_U + 0xE] != 0xEE) {
+            /* only players collect eggs ($7535: types without bit 0 in common) */
+            board.ram[TASK_U + 2] |= 1;
+            board.ram[TASK_X + 2] |= 1;
+            board.ram[TASK_U + 0x33] = board.ram[TASK_X + 0x33] = 0; /* nor take an egg as it is laid ($7528) */
         }
         if (rnd() % 3 == 0) { /* level lances: a tie */
             memcpy(board.ram + TASK_X + 0xA, board.ram + TASK_U + 0xA, 2);
@@ -184,8 +209,12 @@ static void pair_cases(void)
                     board.ram[TASK_U + 0xA] << 8 | board.ram[TASK_U + 0xB], board.ram[TASK_X + 0xA] << 8 | board.ram[TASK_X + 0xB],
                     board.ram[TASK_X + 0x17], board.ram[TASK_U + 0xF], board.ram[TASK_X + 0xF]);
         visited_8487 = 0;
+        uint16_t free_before = (uint16_t)(board.ram[0xA008] << 8 | board.ram[0xA009]);
+        uint8_t aa_before = board.ram[0xA0AA];
         uint16_t end = call(0x83D8, 0);
         tracing = 0;
+        unhorsed += (uint16_t)(board.ram[0xA008] << 8 | board.ram[0xA009]) != free_before;
+        eggs += board.ram[0xA0AA] != aa_before;
         if (end == 0xFFFF) {
             if (failures++ < 8) fprintf(stderr, "test_routines: $83D8 case %d did not return\n", i);
             continue;
@@ -203,7 +232,10 @@ static void pair_cases(void)
         long d = first_difference();
         if (d >= 0 && failures++ < 8)
             fprintf(stderr, "test_routines: $83D8 case %d: $%04lX = %02X, C %02X\n", i, d, board.ram[d], model.ram[d]);
+        if (memcmp(board.cmos, model.cmos, sizeof model.cmos) && failures++ < 8)
+            fprintf(stderr, "test_routines: $83D8 case %d: the CMOS differs\n", i);
     }
+    printf("test_routines: $83D8: %ld unhorsings (an egg laid), %ld eggs collected\n", unhorsed, eggs);
     stop_at_outcomes = 0;
     printf("test_routines: $83D8: %d cases, %ld reaching a path not ported, %ld bounced to the next pair, %ld bounced"
            " by their boxes ($8487) and on\n",
@@ -277,9 +309,9 @@ static void target_cases(void)
     printf("test_routines: $80D6: %d cases, %ld found (%ld player 2)\n", CASES, found, second);
 }
 
-static void platform_cases(void)
+/* RAM of a game in progress, and its player's block */
+static void make_base(void)
 {
-    /* a game in progress */
     static uint8_t cmos[BOARD_CMOS_SIZE];
     board_init(&board, &rom, NULL);
     for (int i = 0; i < 1800; i++) board_run_frame(&board, NULL);
@@ -291,11 +323,58 @@ static void platform_cases(void)
         board.inp1 = f > 1400 ? (uint8_t)(f % 90 < 40 ? INP_RIGHT : 0) : 0;
         board_run_frame(&board, NULL);
     }
-    static uint8_t base[0xC000];
     memcpy(base, board.ram, sizeof base);
-    uint16_t player = 0;
     for (uint16_t t = (uint16_t)(base[0xA00A] << 8 | base[0xA00B]); t; t = (uint16_t)(base[t] << 8 | base[t + 1]))
-        if (base[t + 2] == 0x89) player = t;
+        if (base[t + 2] == 0x89) base_player = t;
+}
+
+static uint8_t bcd(void) { return (uint8_t)((rnd() % 10) << 4 | rnd() % 10); }
+
+static void score_cases(void)
+{
+    long lives = 0;
+    for (int i = 0; i < CASES; i++) {
+        memcpy(board.ram, base, sizeof base);
+        const uint16_t y = 0xA04C;
+        uint8_t was = 0;
+        for (int k = 0; k < 4; k++) board.ram[y + k] = bcd();
+        board.ram[y + 5] = board.ram[y + 6] = (uint8_t)(rnd() % 7);
+        if (rnd() % 8 == 0) board.ram[y + 6] = 0xFF;
+        /* the interval as the operator sets it (none, or 10000-50000 points); the
+           next life ($E6E0 compares +1 + +7 (BCD) and +2 with +8-9) at the score
+           or just past it: a far one would loop for thousands of lives */
+        board.ram[0xA097] = rnd() % 4 ? (uint8_t)(1 + rnd() % 5) : 0;
+        board.ram[0xA098] = 0;
+        board.ram[y + 7] = (uint8_t)(rnd() % 2 ? 0 : 0x80);
+        {
+            int c = 0, h = 0;
+            board.ram[y + 8] = game_daa(game_add(board.ram[y + 1], board.ram[y + 7], 0, &c, &h), &c, h);
+            board.ram[y + 9] = (uint8_t)(board.ram[y + 2] + (rnd() % 2 ? rnd() % 3 : 0));
+        }
+        was = board.ram[y + 5];
+        int nibbles = rnd() % 2;
+        uint8_t a = nibbles ? (uint8_t)((bcd() & 0xF0) | rnd() % 10) : bcd();
+        sync_model();
+        board.cpu.x = 0x88EE;
+        board.cpu.a = a;
+        if (call(nibbles ? 0xE6B1 : 0xE6A8, 0) != RETURN) {
+            if (failures++ < 8) fprintf(stderr, "test_routines: scoring case %d did not return\n", i);
+            continue;
+        }
+        score_add(&model, 0x88EE, a, nibbles);
+        lives += board.ram[y + 5] != was;
+        long d = first_difference();
+        if (d >= 0 && failures++ < 8)
+            fprintf(stderr, "test_routines: scoring case %d: $%04lX = %02X, C %02X\n", i, d, board.ram[d], model.ram[d]);
+        if (memcmp(board.cmos, model.cmos, sizeof model.cmos) && failures++ < 8)
+            fprintf(stderr, "test_routines: scoring case %d: the CMOS differs\n", i);
+    }
+    printf("test_routines: scoring: %d cases, %ld with extra lives\n", CASES, lives);
+}
+
+static void platform_cases(void)
+{
+    uint16_t player = base_player;
     if (!player) {
         if (failures++ < 8) fprintf(stderr, "test_routines: no player in the game at frame 2000\n");
         return;
@@ -357,9 +436,13 @@ int main(int argc, char **argv)
     board.romsel = 1;    /* as the game runs */
     board.cpu.dp = 0xA0; /* direct page: the game's globals */
     rows_cases();
+    make_base();
+    board.cpu.dp = 0xA0;
+    board.romsel = 1; /* the game had it off at that moment */
     pair_cases();
     display_cases();
     target_cases();
+    score_cases();
     platform_cases();
     if (failures) {
         fprintf(stderr, "test_routines: %d differences\n", failures);

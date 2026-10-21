@@ -27,6 +27,7 @@ typedef struct {
     uint8_t in0, inp1, inp2;
     uint8_t pia0_crb;   /* $C807 */
     int mux;            /* CB2 as $C807 last set it */
+    uint8_t cmos[1024]; /* $CC00-$CFFF: nibbles, | $F0 as the board keeps them */
     /* optional, for tests: called before each RAM write the C game makes,
        and on each RAM read */
     void (*on_write)(void *user, uint16_t addr);
@@ -42,12 +43,13 @@ typedef enum {
 /* The whole state from a RAM image of $0000-$BFFF and the ROM select. */
 void game_load(Game *g, const uint8_t *ram, uint8_t romsel);
 /* A byte as the main CPU reads it: ROM under $0000-$8FFF when selected,
-   RAM below $C000, ROM from $D000; of the I/O, the controls ($C804) and
-   PIA 0's control register B ($C807); other I/O reads give 0. */
+   RAM below $C000, ROM from $D000; of the I/O, the controls ($C804), PIA
+   0's control register B ($C807) and the CMOS; other I/O reads give 0. */
 uint8_t game_read(const Game *g, uint16_t addr);
 uint16_t game_read_word(const Game *g, uint16_t addr);
 /* A RAM byte or big-endian word. A poke at $C807 sets PIA 0's control
-   register B (and the multiplexer); other I/O is not modelled. */
+   register B (and the multiplexer), at $CC00-$CFFF the CMOS; other I/O
+   is not modelled. */
 uint8_t game_peek(const Game *g, uint16_t addr);
 void game_poke(Game *g, uint16_t addr, uint8_t value);
 uint16_t game_word(const Game *g, uint16_t addr);
@@ -59,6 +61,15 @@ void game_select_rom(Game *g, uint8_t value);
    w_reg and h_reg before the XOR 4), on the C game's RAM: gfx/williams.c's
    blitter, which the board's is too. Each byte goes through on_write. */
 void game_blit(Game *g, uint8_t ctrl, uint8_t solid, uint16_t src, uint16_t dst, uint8_t w_reg, uint8_t h_reg);
+
+/* An 8-bit add with carry in, as ADDA/ADCA: the sum, and *c and *h its
+   carry and half carry (for DAA). */
+uint8_t game_add(uint8_t a, uint8_t b, int cin, int *c, int *h);
+/* DAA after an add with carry c and half carry h: *c gets the new carry. */
+uint8_t game_daa(uint8_t a, int *c, int h);
+/* $4110 (via $3B2B): CMOS audit counter n (3 BCD bytes as 6 nibbles at
+   $CCFC + 6n) plus 1. */
+void game_audit(Game *g, uint8_t n);
 
 /* $6BA6: both players' controls through the multiplexer: A player 1's
    and the start buttons (& $37), B player 2's (& $07). */

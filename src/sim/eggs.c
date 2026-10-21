@@ -3,6 +3,7 @@
 #include "sim/display.h"
 #include "sim/platform.h"
 #include "sim/rider.h"
+#include "sim/score.h"
 #include "sim/tasks.h"
 
 #define FLYING 0x7611
@@ -126,6 +127,62 @@ static StepResult fall(Game *g, uint16_t u)
     }
     draw(g, u);
     return task_sleep(g, game_peek(g, 0xA0B0), FALLING);
+}
+
+void eggs_collect(Game *g, uint16_t u, uint16_t x)
+{
+    game_sound(g, 0xEF86);
+    uint16_t t = game_word(g, F(u, 0xD));
+    game_poke(g, F(x, 0x2F), game_read(g, (uint16_t)(t + 0x2E)));
+    uint16_t count = game_read_word(g, (uint16_t)(t + 0x12));
+    uint8_t b = game_peek(g, count);
+    if (b < 4) b++;
+    game_poke(g, count, b);
+    game_poke(g, F(x, 0x2E), b);
+    uint16_t e = (uint16_t)(0x75A1 + (int8_t)(uint8_t)(b * 3));
+    score_add(g, t, game_read(g, e), game_read_word(g, (uint16_t)(e + 1)) == 0xE6B1);
+    game_poke(g, F(x, 0x33), 0);
+    if (!game_peek(g, F(x, 0x35))) { /* caught in the air */
+        game_poke(g, F(x, 0x33), 0xFF);
+        score_add(g, t, 0x05, 0);
+    }
+    game_poke(g, 0xA0AA, (uint8_t)(game_peek(g, 0xA0AA) - 1));
+    uint16_t mount = game_word(g, F(x, 0x2B));
+    if (mount) {
+        game_poke(g, 0xA0A1, (uint8_t)(game_peek(g, 0xA0A1) - 1));
+        game_set_word(g, F(mount, 0x24), 0xEEC2);
+    }
+    game_set_word(g, F(x, 5), 0x77AC);
+    game_poke(g, F(x, 4), 4);
+    game_poke(g, F(x, 2), game_peek(g, F(x, 2)) & 0x7F);
+}
+
+void eggs_lay(Game *g, uint16_t u, uint16_t winner)
+{
+    game_sound(g, 0xEF97);
+    game_poke(g, 0xA08E, (uint8_t)(game_peek(g, 0xA08E) - game_peek(g, F(u, 0x34))));
+    game_poke(g, 0xA0A1, (uint8_t)(game_peek(g, 0xA0A1) - 1));
+    uint16_t y = task_create(g, u, FLYING, 0x82, game_peek(g, F(u, 3)));
+    game_set_word(g, F(y, 0x2B), 0);
+    game_set_word(g, F(y, 0x1C), 0);
+    game_set_word(g, F(y, 0x27), 0);
+    uint16_t a = game_word(g, F(u, 0xA));
+    game_set_word(g, F(y, 0xA), (uint16_t)((a & 0xFF00) | (uint8_t)(a - 8)));
+    game_set_word(g, F(y, 7), (uint16_t)(game_word(g, F(u, 7)) + 4));
+    game_poke(g, F(y, 0x35), 0);
+    uint16_t t = game_word(g, F(u, 0xD));
+    if (t < 0x89E3) t = (uint16_t)(t + 0x31); /* hatching one rank up */
+    game_set_word(g, F(y, 0xD), t);
+    game_set_word(g, F(y, 0x11), game_word(g, F(u, 0x11)));
+    game_poke(g, F(y, 0x14), game_peek(g, F(u, 0x14)));
+    game_poke(g, F(y, 0x22), 0);
+    game_poke(g, F(y, 0x23), 0);
+    game_poke(g, F(y, 0x16), 0);
+    game_poke(g, F(y, 0x10), 0);
+    game_poke(g, F(y, 0x33), game_peek(g, F(u, 0x33)));
+    uint8_t n = (uint8_t)(game_peek(g, F(y, 0x33)) - 1);
+    game_poke(g, F(y, 0x33), n);
+    if (!n && winner) eggs_collect(g, winner, y);
 }
 
 StepResult eggs_step(Game *g, uint16_t u, uint16_t at)

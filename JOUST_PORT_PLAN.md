@@ -216,10 +216,31 @@ named; `game` checks each (section 3).
   equal is a tie ($847D: the sound $EFCE, both bounced, $852D: up/down by
   +$23 and the velocities, apart by <$34's sign with turned speeds and
   pushes of half their speed, facings away; the walk moves to the next
-  pair), the lower one unhorsed ($84C6 U, $850B X: not ported yet: the
-  type's bit 7 off, +$1A cleared, the brain $EEC2, the table's +$10
-  routine, $74C3 an enemy's egg or $8279 a player's death, and the
-  winner's +$16 scoring, $E6A8/$E6B1).
+  pair), the lower one unhorsed ($84C6 U, $850B X; $84E0: the type's bit
+  7 off, +$1A cleared, the brain $EEC2 (its mount flies off), the loser's
+  table's +$10 routine, then its +$16 scores the winner with the table's
+  +$2F points; then they bounce, or come off a type $97 by their boxes).
+  $74C3 lays an enemy's egg (the sound $EF97, <$8E less its +$34, <$A1
+  down; a task $7611 of type $82 after it: 8 lines up, 4 right, its
+  velocity and speed, its table one rank up below $89E3 (+$31), +$33 from
+  its own less 1, and at 0 the winner catches it at once). A player's
+  death ($8279) is not ported. $753B (also $7535, types without bit 0 in
+  common): an egg collected (the sound $EF86, the collector's egg count,
+  [+D]+$12, up to 4; points by it from $75A1: 250, 500, 750, 1000, plus
+  500 caught in the air; one enemy fewer, <$AA; its waiting mount sent
+  off; the egg's task on to $77AC in 4 frames to show its points).
+- **Scores** (`sim/score.c`, $E6A8-$E71C, $8719): a table's +4 points at
+  the score block (player 1's $A04C: +0-3 BCD, +4 the change flag, +5-6
+  the lives, +7-9 the next extra life), 0 for the enemies'. $E6A8 adds A
+  (BCD, `DAA`) at +2 and carries up (a carry out of the top adds $10);
+  $E6B1 adds A's high nibble at +3 and its low nibble with the carry at
+  +2. While the interval <$97-<$98 (from the CMOS) is set and +1 + +7
+  (BCD) : +2 reaches +8-9: a life ($8719: +5 and +6 up, kept from
+  wrapping; the icon blitted from the table's +8 to its +6 + 3 x lives -
+  3, while lives are 5 or fewer), the sound $EF67, CMOS audit counter 5
+  ($4110: 3 BCD bytes as 6 nibbles at $CCFC + 6n) up, and +8-9 raised by
+  the interval (+$80 at +7 and +8 when +8 passes $30). The C game keeps
+  the CMOS (`Game.cmos`) and a faithful `DAA` (`game_daa`).
 - **Scores** ($E785-$E80C, `sim/scores.c`): a task per score, +D its
   table in ROM ($E71D for player 1's): +0 the change flag ($A050), +2 the
   colours (the second blit's control and solid), then 6-byte entries from
@@ -424,9 +445,12 @@ named; `game` checks each (section 3).
   the same RAM; results and all of RAM must match. So far $DC21 (20000
   random row lists, well formed and noise: 5384 overlap) and $83D8 (20000
   random pairs of task blocks, a third with level lances, through the
-  outcome: 281 ties, 126 bounces by their boxes, 660 at a path not
-  ported; it found the facing test reversed, which no scripted game had
-  reached), the display list's six node entries (20000 random chains, free
+  outcome, on a game in progress with the riders' real tables: about 530
+  ties, 270 box bounces, 416 unhorsings with their eggs, 115 eggs
+  collected; it found the facing test reversed, which no scripted game had
+  reached), scoring ($E6A8/$E6B1 on random BCD scores, points and
+  thresholds: 14572 extra lives; it catches a `DAA` bug the games miss),
+  the display list's six node entries (20000 random chains, free
   pointers and objects: the node returned and all of RAM), $D9A3 on a
   game in progress with the player at random x, line, velocity, speed and
   push (20000: 2192 land, 2236 bounce; $DC21's end rows checked too),

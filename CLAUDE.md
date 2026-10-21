@@ -102,7 +102,8 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   $8F04/$8F3D, landing, on the ground, $8D4D, taking off and falling off;
   the players' brains and $EEC2's), `wave.c` (the wave manager's frequent path, $6D91), `eggs.c` (eggs in
   flight and at rest; hatching not yet), `spawn.c` (a rider appearing on a
-  pad and waiting on it), `brains.c` (the enemies' brains,
+  pad and waiting on it), `score.c` (scores, extra lives, CMOS audits;
+  the model keeps the CMOS and a faithful `DAA`), `brains.c` (the enemies' brains,
   $7A83-$80D5: state machines as basic blocks by ROM address; $80D6 the
   target), `platform.c` (landing on a platform, bouncing off one, $D9A3);
   each mirrors a ROM routine's arithmetic exactly
@@ -158,8 +159,12 @@ Every change keeps `ctest` green.
   check a new port by planting a bug: the test must catch it.
 - `routines` - label `rom`: ROM routines run on the emulated CPU (direct page
   $A0, interrupts masked) from chosen RAM and registers until they return,
-  against the C ones on the same RAM: $DC21, $83D8, the display list's
-  nodes, $80D6 and $D9A3 (on a game in progress) on 20000 random cases each. Use it where scripted play rarely reaches a path; aim cases at the
+  against the C ones on the same RAM: $DC21, $83D8 with its outcome
+  (unhorsings, eggs), the display list's nodes, $80D6, scoring and $D9A3
+  (on a game in progress) on 20000 random cases each; RAM and the CMOS.
+  Keep the random cases possible in the game (e.g. only players collect
+  eggs): an impossible state sends the ROM through garbage. Each call
+  starts with DP $A0 and the ROM selected. `ONLY=n` traces one pair case. Use it where scripted play rarely reaches a path; aim cases at the
   edges. `TRACE=1` prints the ROM's path for the first cases.
 - `mame_emu` - label `mame`: the emulated board from power-on with the primed
   CMOS and the probes' script: all 20000 random-state changes in MAME's order

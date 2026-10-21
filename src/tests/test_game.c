@@ -29,6 +29,8 @@
  * (e.g. the random state the interrupt stirs, read before the stir and
  * rotated after it). Between steps the model must equal RAM at every frame (a
  * check of the copying). The stack page ($BE00-$BEFF) is never compared.
+ * The CMOS is not RAM: the board's is loaded into the model at each step,
+ * and the C step's must equal it when the ROM's step yields.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,6 +80,7 @@ static void read_hook(void *user, uint16_t addr)
     c_read[addr] = 1;
 }
 static int predicted_mux;
+static uint8_t predicted_cmos[1024];
 static int step_active, step_interrupted;
 static long steps, steps_unported, steps_matched, steps_reordered, steps_raced, frame_checks;
 static struct { uint16_t at; long n, ported, matched; } by_resume[128];
@@ -220,6 +223,7 @@ static void start_step(uint16_t task)
     step_task = task;
     step_at = at;
     steps++;
+    memcpy(model.cmos, board.cmos, sizeof model.cmos); /* not RAM: the board's, at each step */
     model.in0 = board.in0; /* the controls change between frames: as the PIA shows them now */
     model.inp1 = board.inp1;
     model.inp2 = board.inp2;
@@ -246,6 +250,7 @@ static void start_step(uint16_t task)
             predicted[a] = scratch.ram[a];
         }
     predicted_romsel = scratch.romsel;
+    memcpy(predicted_cmos, scratch.cmos, sizeof predicted_cmos);
     predicted_crb = scratch.pia0_crb;
     predicted_mux = scratch.mux;
     step_active = 1;
@@ -255,6 +260,13 @@ static void start_step(uint16_t task)
 static void end_step(void)
 {
     step_active = 0;
+    for (int i = 0; i < 1024; i++)
+        if (predicted_cmos[i] != board.cmos[i]) {
+            if (failures++ < 8)
+                fprintf(stderr, "test_game: frame %lld: CMOS $%04X = %02X, C %02X (task $%04X at $%04X)\n",
+                        (long long)board.frame, 0xCC00 + i, board.cmos[i], predicted_cmos[i], step_task, step_at);
+            break;
+        }
     model.romsel = predicted_romsel;
     model.pia0_crb = predicted_crb;
     model.mux = predicted_mux;

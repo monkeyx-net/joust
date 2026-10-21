@@ -36,6 +36,7 @@ uint8_t game_read(const Game *g, uint16_t addr)
     if (addr >= 0xD000) return g->rom[addr];
     if (addr == 0xC804) return (uint8_t)(((g->mux ? g->inp1 : g->inp2) & 0x0F) | (g->in0 & 0x30));
     if (addr == 0xC807) return g->pia0_crb;
+    if (addr >= 0xCC00) return g->cmos[addr - 0xCC00];
     return 0;
 }
 
@@ -56,6 +57,10 @@ void game_poke(Game *g, uint16_t addr, uint8_t value)
     if (addr == 0xC807) { /* as pia6821.c: the IRQ flags stay; CB2 follows bit 3 in its manual output mode */
         g->pia0_crb = (uint8_t)((g->pia0_crb & 0xC0) | (value & 0x3F));
         if ((value & 0x30) == 0x30) g->mux = (value >> 3) & 1;
+        return;
+    }
+    if (addr >= 0xCC00 && addr < 0xD000) {
+        g->cmos[addr - 0xCC00] = value | 0xF0;
         return;
     }
     if (addr >= GAME_RAM) return;
@@ -91,6 +96,53 @@ void game_blit(Game *g, uint8_t ctrl, uint8_t solid, uint16_t src, uint16_t dst,
 {
     WilliamsBus bus = { g->ram, NULL, g->romsel & 1, blit_wrote, g, g->rom };
     williams_blit(&bus, ctrl, solid, src, dst, w_reg, h_reg);
+}
+
+uint8_t game_add(uint8_t a, uint8_t b, int cin, int *c, int *h)
+{
+    unsigned r = (unsigned)a + b + (cin ? 1 : 0);
+    *h = ((a & 0x0F) + (b & 0x0F) + (cin ? 1 : 0)) > 0x0F;
+    *c = r > 0xFF;
+    return (uint8_t)r;
+}
+
+uint8_t game_daa(uint8_t a, int *c, int h)
+{
+    unsigned fix = 0, msn = a & 0xF0, lsn = a & 0x0F;
+    if (lsn > 9 || h) fix |= 0x06;
+    if ((msn > 0x80 && lsn > 9) || msn > 0x90 || *c) fix |= 0x60;
+    unsigned t = fix + a;
+    if (t > 0xFF) *c = 1;
+    return (uint8_t)t;
+}
+
+/* $40F2: a byte from two CMOS nibbles at x */
+static uint8_t cmos_byte(const Game *g, uint16_t x)
+{
+    return (uint8_t)((game_read(g, x) << 4) + (game_read(g, (uint16_t)(x + 1)) & 0x0F));
+}
+
+/* $40FA: a byte to two nibbles */
+static void cmos_put(Game *g, uint16_t x, uint8_t v)
+{
+    game_poke(g, (uint16_t)(x + 1), v);
+    game_poke(g, x, (uint8_t)(v >> 4));
+}
+
+void game_audit(Game *g, uint8_t n)
+{
+    uint16_t x = (uint16_t)(0xCCFC + (n & 0x0F) * 6);
+    uint8_t hi = cmos_byte(g, x), mid = cmos_byte(g, (uint16_t)(x + 2)), lo = cmos_byte(g, (uint16_t)(x + 4));
+    int c, h;
+    lo = game_add(lo, 1, 0, &c, &h);
+    lo = game_daa(lo, &c, h);
+    mid = game_add(mid, 0, c, &c, &h);
+    mid = game_daa(mid, &c, h);
+    hi = game_add(hi, 0, c, &c, &h);
+    hi = game_daa(hi, &c, h);
+    cmos_put(g, x, hi);
+    cmos_put(g, (uint16_t)(x + 2), mid);
+    cmos_put(g, (uint16_t)(x + 4), lo);
 }
 
 uint16_t game_controls(Game *g)

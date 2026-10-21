@@ -19,5 +19,9 @@
 
 int eggs_ported(uint16_t at);
 StepResult eggs_step(Game *g, uint16_t task, uint16_t at);
+/* $74C3: the rider at u unhorsed by `winner` (0 for none) lays an egg */
+void eggs_lay(Game *g, uint16_t u, uint16_t winner);
+/* $753B: the egg at x collected by the rider at u */
+void eggs_collect(Game *g, uint16_t u, uint16_t x);
 
 #endif

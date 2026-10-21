@@ -1,5 +1,7 @@
 #include "sim/collide.h"
 
+#include "sim/eggs.h"
+#include "sim/score.h"
 #include "sim/tasks.h"
 
 #define PAIRS_START 0x837A
@@ -235,6 +237,22 @@ static void off_box(Game *g, uint16_t u, uint16_t x)
     }
 }
 
+/* $84E0: `loser` unhorsed by `winner`: its mount flies off, its table's
+   +$10 routine ($74C3 an egg; $8279 a player's death: not ported), the
+   winner scored by its +$16 ($E6A8 or $E6B1). 0, or -1 not ported. */
+static int unhorse(Game *g, uint16_t loser, uint16_t winner)
+{
+    uint16_t t = game_word(g, F(loser, 0xD));
+    uint16_t then = game_read_word(g, (uint16_t)(t + 0x10)), score = game_read_word(g, (uint16_t)(t + 0x16));
+    if (then != 0x74C3 || (score != 0xE6A8 && score != 0xE6B1)) return -1;
+    game_poke(g, F(loser, 2), game_peek(g, F(loser, 2)) & 0x7F);
+    game_set_word(g, F(loser, 0x1A), 0);
+    game_set_word(g, F(loser, 0x24), 0xEEC2);
+    eggs_lay(g, loser, winner);
+    score_add(g, game_word(g, F(winner, 0xD)), game_read(g, (uint16_t)(t + 0x2F)), score == 0xE6B1);
+    return 0;
+}
+
 /* $84B7: bounced by their lines */
 static void by_lines(Game *g, uint16_t u, uint16_t x)
 {
@@ -245,7 +263,11 @@ static void by_lines(Game *g, uint16_t u, uint16_t x)
 static int outcome(Game *g, uint16_t u, uint16_t x)
 {
     uint8_t both = game_peek(g, F(u, 2)) & game_peek(g, F(x, 2));
-    if (!(both & 1)) return -1; /* $7535 or a SWI */
+    if (!(both & 1)) { /* $7535: an egg collected; or a SWI */
+        if (both & 2) return -1;
+        eggs_collect(g, u, x);
+        return 0;
+    }
     if (both & 4) { /* $8487 */
         game_sound(g, 0xEF9D);
         if (game_peek(g, F(u, 2)) == 0x97) {
@@ -272,17 +294,27 @@ static int outcome(Game *g, uint16_t u, uint16_t x)
         }
         if (near && ((game_peek(g, F(u, 0xF)) ^ game_peek(g, F(x, 0xF))) & 0x80)) {
             int right = !(game_peek(g, F(u, 0xF)) & 0x80);
-            if ((game_word(g, DX) & 0x8000) ? !right : right) return -1; /* $850B: x unhorsed */
+            if ((game_word(g, DX) & 0x8000) ? !right : right) goto x_loses;
         }
     }
     /* $8466: by their lance lines */
     int d = (int)sp(g, x, 0x26) - sp(g, u, 0x26) + (int)(int16_t)game_word(g, F(x, 0xA)) -
             (int)(int16_t)game_word(g, F(u, 0xA));
-    if ((uint16_t)d & 0x8000) return -1;   /* $84C6: u unhorsed */
-    if ((uint16_t)d) return -1;            /* $850B: x unhorsed */
+    if ((uint16_t)d & 0x8000) { /* $84C6: u unhorsed */
+        if (unhorse(g, u, x)) return -1;
+        if (game_peek(g, F(x, 2)) == 0x97) off_box(g, x, u);
+        else bounce(g, u, x, 1);
+        return 1;
+    }
+    if ((uint16_t)d) goto x_loses;
     game_sound(g, 0xEFCE);                /* $847D: a tie */
     bounce(g, u, x, 1);
     return 1;
+x_loses: /* $850B */
+    if (unhorse(g, x, u)) return -1;
+    if (game_peek(g, F(u, 2)) == 0x97) off_box(g, u, x);
+    else bounce(g, u, x, 0);
+    return 0;
 }
 
 /* $83D8: 0 apart (or met, the walk going on), 1 met (on to the next pair), -1 a path not ported */
