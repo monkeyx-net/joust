@@ -26,4 +26,13 @@ uint16_t text_number_small(Game *g, uint8_t bcd, uint8_t colour, uint16_t x);
 /* $4A7F (through $4A50): character c in the small font */
 uint16_t text_char_small(Game *g, uint8_t c, uint8_t colour, uint16_t x);
 
+/* $4A70 (through $4A59) and $4AE5 (through $4A5F): the same in the large font */
+uint16_t text_char_large(Game *g, uint8_t c, uint8_t colour, uint16_t x);
+uint16_t text_number_large(Game *g, uint8_t bcd, uint8_t colour, uint16_t x);
+
+/* $4B2B-$4B5B (through $4A62, $4A65, $4A6A, $4A6D): the text block a
+   ([$5D7B + 2a]: [screen address][colour][message], bit 7 on the last),
+   shown or erased (<$F6), in the small or large font */
+void text_block(Game *g, uint8_t a, int erase, int large);
+
 #endif

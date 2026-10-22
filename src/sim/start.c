@@ -1,6 +1,7 @@
 #include "sim/start.h"
 
 #include "sim/attract.h"
+#include "sim/hiscores.h"
 #include "sim/score.h"
 #include "sim/spawn.h"
 #include "sim/tasks.h"
@@ -112,31 +113,12 @@ static void platform_pictures(Game *g)
     }
 }
 
-/* $4B2B-$4B5B: the text block a ([$5D7B + 2a]: [screen address][colour]
-   [message], bit 7 on the last), shown or erased (<$F6), in the small or
-   large font */
-static void block(Game *g, uint8_t a, int erase, int large)
-{
-    poke(g, 0xA0F6, erase ? (uint8_t)(peek(g, 0xA0F6) + 1) : 0);
-    uint16_t y = rom_word(g, (uint16_t)(0x5D7B + 2 * (int8_t)a));
-    for (;;) {
-        uint16_t x = rom_word(g, y);
-        uint8_t colour = rom(g, (uint16_t)(y + 2));
-        y = (uint16_t)(y + 3);
-        if (peek(g, 0xA0F6)) colour = 0;
-        uint8_t msg = rom(g, y) & 0x7F;
-        if (large) text_message(g, msg, colour, x);
-        else text_message_small(g, msg, colour, x);
-        if (rom(g, y++) & 0x80) return;
-    }
-}
-
 /* $5FBC: a demo page's block a shown (0 none; bit 7 the large font) */
 static void show(Game *g, uint8_t a)
 {
     if (!a) return;
-    if (a & 0x80) block(g, a & 0x7F, 0, 1);
-    else block(g, a, 0, 0);
+    if (a & 0x80) text_block(g, a & 0x7F, 0, 1);
+    else text_block(g, a, 0, 0);
 }
 
 /* $60A3: a demo rider (table x) on its own task ($8EC8, type $8F) after
@@ -266,8 +248,8 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
                 uint16_t s = F(u, 0x18);
                 while (peek(g, s++) != a) continue;
                 poke(g, --s, 0);
-                if (a & 0x80) block(g, a & 0x7F, 1, 1);
-                else block(g, a, 1, 0);
+                if (a & 0x80) text_block(g, a & 0x7F, 1, 1);
+                else text_block(g, a, 1, 0);
             }
             return task_sleep(g, 8, 0x5F69);
         case 0x5F69:
@@ -358,7 +340,9 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
             set_word(g, F(u, 0xD), 0x0384);
             poke(g, F(u, 0x10), 0);
             start_palette(g, 0x62E9);
-            return STEP_UNPORTED; /* $3B43: the high score table (the system ROM) */
+            hiscores_table(g);
+            start_credits(g, 0x12, 0x00);
+            return task_sleep(g, 1, 0x62AD);
         case 0x62AD:
             poke(g, 0xA011, (uint8_t)(peek(g, 0xA011) + 1));
             if (word(g, F(u, 0xD))) {
@@ -389,7 +373,7 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
             start_clear_screen(g);
             start_palette(g, rom_word(g, 0xE033));
             start_credits(g, 0x12, 0x00);
-            block(g, (uint8_t)(peek(g, 0xA0F2) == 1 ? 0x19 : 0x1A), 0, 0);
+            text_block(g, (uint8_t)(peek(g, 0xA0F2) == 1 ? 0x19 : 0x1A), 0, 0);
             return task_sleep(g, 0x3C, 0x6327);
         case 0x6327:
             poke(g, F(u, 0xD), (uint8_t)(peek(g, F(u, 0xD)) - 1));

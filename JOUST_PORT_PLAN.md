@@ -511,8 +511,11 @@ named; `game` checks each (section 3).
   round the border ($D15B: the loop's place in +$13 as the ROM keeps its
   return address; +$12 takes the CPU's B as the task first runs, which
   the C model keeps as `Game.b`, as it keeps Y for $81C4) and a palette
-  sweep ($D0ED); then the demo. Not ported: the system ROM's pages ($3B43
-  the high score table, $3B61 the entry, $3BCD).
+  sweep ($D0ED); then the demo. The high score table's page
+  (`sim/hiscores.c`, $414F): the border ($FF87, solid blocks in colours
+  stepping by $11), the best one's name and score, three columns of 13 in
+  the large font and today's six in the small, the newest entries in
+  their players' colours. Not ported: the entry ($3B61) and $3BCD.
 - **A secret code** ($6B20-$6BA5, in `sim/flow.c`): during a game a task
   watches both players' controls ($6BA6) for $2502, then $1204, then
   $0506 (player 1 left+flap with start 1 and player 2 right; start 2 with
