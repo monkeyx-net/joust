@@ -1,5 +1,7 @@
 #include "sim/rider.h"
 
+#include <stddef.h>
+
 #include "sim/brains.h"
 #include "sim/display.h"
 #include "sim/platform.h"
@@ -19,7 +21,12 @@
 #define RUN_SPEEDS 0x8FB5 /* the run animation by the landing speed */
 #define SKID 0xDD2C       /* the run animation's skid */
 
-int rider_ported(uint16_t at) { return at == RIDER_FLAPPING || at == RIDER_GLIDING || at == RIDER_STANDING; }
+#define RIDER_AIRBORNE 0x8EAF
+
+int rider_ported(uint16_t at)
+{
+    return at == RIDER_FLAPPING || at == RIDER_GLIDING || at == RIDER_STANDING || at == RIDER_AIRBORNE;
+}
 
 static uint16_t field(uint16_t u, int off) { return (uint16_t)(u + off); }
 
@@ -99,6 +106,9 @@ static void ahead(Game *g, uint16_t u, uint8_t flap)
     game_poke(g, CONTROLS + 1, flap);
 }
 
+static StepResult standing(Game *g, uint16_t u);
+static StepResult airborne(Game *g, uint16_t u);
+
 /* the brain at +$24: 0 its controls in <$32-<$33, 1 it ended the step
    (asleep), -1 a brain not ported */
 enum { BRAIN_SET = 0, BRAIN_SLEPT = 1, BRAIN_UNPORTED = -1 };
@@ -133,7 +143,21 @@ int rider_brain(Game *g, uint16_t u, StepResult *slept)
         return BRAIN_SET;
     }
     }
-    return brain_enemy(g, u, b) ? BRAIN_UNPORTED : BRAIN_SET;
+    int r = brain_enemy(g, u, b);
+    if (r < 0) return BRAIN_UNPORTED;
+    if (r) { /* $8D40: it has its knight: standing where it is */
+        uint16_t t = game_word(g, field(u, 0xD));
+        game_set_word(g, field(u, 0x1A), game_read_word(g, game_read_word(g, (uint16_t)(t + 0x0A)))); /* $8CF1 */
+        game_set_word(g, field(u, 0x20), 0xDCE6);
+        game_set_word(g, field(u, 0x11), 0);
+        static const int cleared[] = { 0x14, 0x16, 0x10, 0x13, 0x15, 0x22, 0x23 };
+        for (size_t i = 0; i < sizeof cleared / sizeof cleared[0]; i++) game_poke(g, field(u, cleared[i]), 0);
+        game_poke(g, field(u, 2), game_peek(g, field(u, 2)) | 0x80);
+        game_poke(g, field(u, 0x17), 0x0C);
+        *slept = standing(g, u);
+        return BRAIN_SLEPT;
+    }
+    return BRAIN_SET;
 }
 
 /* $D83D: the brain, the facing, frames since a flap, the erase nodes; as brain() */
@@ -316,6 +340,12 @@ static StepResult take_off(Game *g, uint16_t u)
     pictures(g, u, 0);
     game_set_word(g, field(u, 0x11), 0xFF80);
     game_poke(g, field(u, 0xB), (uint8_t)(game_peek(g, field(u, 0xB)) - 1));
+    return airborne(g, u);
+}
+
+/* $8EAF (also a hatched egg's mount, flying in) */
+static StepResult airborne(Game *g, uint16_t u)
+{
     game_poke(g, field(u, 0xC), 0);
     game_poke(g, field(u, 9), 0);
     game_poke(g, field(u, 0x23), 0);
@@ -456,6 +486,7 @@ StepResult rider_ground_on(Game *g, uint16_t u)
 StepResult rider_step(Game *g, uint16_t u, uint16_t at)
 {
     if (at == RIDER_STANDING) return ground(g, u);
+    if (at == RIDER_AIRBORNE) return airborne(g, u);
     if (game_word(g, field(u, 0x30)) != FLYING) return STEP_UNPORTED;
     StepResult slept = STEP_DONE;
     int r = think(g, u, &slept);

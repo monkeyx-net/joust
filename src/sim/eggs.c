@@ -9,8 +9,18 @@
 #define FLYING 0x7611
 #define FALLING 0x7619
 #define RESTING 0x76A7
+#define GROWING 0x7757  /* hatching: the knight's frames from $7924 */
+#define HATCHED 0x7779
+#define STANDING 0x7792 /* the knight waiting for its mount */
+#define TAKEN 0x7887    /* picked up ($7A2F) */
+#define MOUNT 0x8EAF    /* the mount's task, flying in */
+#define MOUNT_BRAIN 0x793C
 
-int eggs_ported(uint16_t at) { return at == FLYING || at == FALLING || at == RESTING; }
+int eggs_ported(uint16_t at)
+{
+    return at == FLYING || at == FALLING || at == RESTING || at == GROWING || at == HATCHED || at == STANDING ||
+           at == TAKEN;
+}
 
 static uint16_t F(uint16_t u, int off) { return (uint16_t)(u + off); }
 
@@ -29,8 +39,7 @@ static void draw(Game *g, uint16_t u)
     display_clip(g, node);
 }
 
-/* $6AF3: its erase node, if it was drawn */
-static void erase(Game *g, uint16_t u)
+void eggs_erase(Game *g, uint16_t u)
 {
     uint16_t rec = game_word(g, F(u, 0x1C));
     if (!rec) return;
@@ -39,6 +48,15 @@ static void erase(Game *g, uint16_t u)
     display_fill(g, node, rec);
     display_clip(g, node);
 }
+
+void eggs_walls(Game *g, uint16_t u)
+{
+    uint8_t a = game_read(g, (uint16_t)(game_word(g, F(u, 7)) - 0x515E)) &
+                game_read(g, (uint16_t)(game_word(g, F(u, 0xA)) - 0x17BE));
+    game_poke(g, 0xA04B, a | game_peek(g, 0xA04B));
+}
+
+static void erase(Game *g, uint16_t u) { eggs_erase(g, u); }
 
 /* $75B0 */
 static void move(Game *g, uint16_t u)
@@ -90,11 +108,7 @@ static StepResult fall(Game *g, uint16_t u)
 {
     erase(g, u);
     move(g, u);
-    { /* $779B */
-        uint8_t a = game_read(g, (uint16_t)(game_word(g, F(u, 7)) - 0x515E)) &
-                    game_read(g, (uint16_t)(game_word(g, F(u, 0xA)) - 0x17BE));
-        game_poke(g, 0xA04B, a | game_peek(g, 0xA04B));
-    }
+    eggs_walls(g, u);
     uint8_t top = ground(g, u, 0);
     if (top) { /* $7660: on a platform */
         game_poke(g, F(u, 0x35), top);
@@ -127,6 +141,60 @@ static StepResult fall(Game *g, uint16_t u)
     }
     draw(g, u);
     return task_sleep(g, game_peek(g, 0xA0B0), FALLING);
+}
+
+/* $7757: the knight's next frame ([$0028] + the byte at +$2E's record:
+   [frame][height][frames to the next, 0 the last]) */
+static StepResult grow(Game *g, uint16_t u)
+{
+    erase(g, u);
+    uint16_t node = display_object(g, u, 1, 1);
+    uint16_t x = game_word(g, F(u, 0x2E));
+    uint16_t rec = (uint16_t)(game_read_word(g, 0x0028) + (int8_t)game_read(g, x));
+    game_set_word(g, F(u, 0x1C), rec);
+    display_fill(g, node, rec);
+    display_clip(g, node);
+    uint8_t a = game_peek(g, F(u, 0xB));
+    game_poke(g, F(u, 0x27), a);
+    game_poke(g, F(u, 0x28), (uint8_t)(a - game_read(g, (uint16_t)(x + 1))));
+    a = game_read(g, (uint16_t)(x + 2));
+    if (!a) return task_sleep(g, 7, HATCHED);
+    game_set_word(g, F(u, 0x2E), (uint16_t)(x + 3));
+    return task_sleep(g, a, GROWING);
+}
+
+/* $76D0: hatching: a mount flies in for the knight */
+static StepResult hatch(Game *g, uint16_t u)
+{
+    game_poke(g, 0xA0A1, (uint8_t)(game_peek(g, 0xA0A1) + 1));
+    game_sound(g, 0xEF89);
+    uint16_t y = task_create(g, u, MOUNT, 0x0F, game_peek(g, F(u, 3)));
+    game_set_word(g, F(u, 0x2B), y);
+    game_set_word(g, F(y, 0x2B), u);
+    game_poke(g, F(y, 0x33), game_peek(g, F(u, 0x33)));
+    game_poke(g, F(y, 0x34), 0);
+    game_poke(g, F(y, 0xF), 0);
+    game_poke(g, F(y, 0x2E), 0);
+    game_poke(g, F(y, 0x14), 8);
+    game_set_word(g, F(y, 0x11), 0);
+    game_set_word(g, F(y, 0x1A), 0);
+    game_poke(g, F(y, 0x22), 0);
+    game_poke(g, F(y, 0x16), 0);
+    game_poke(g, F(y, 0x10), 0);
+    game_set_word(g, F(y, 0x18), game_read_word(g, 0x001A));
+    game_set_word(g, F(y, 0xD), game_word(g, F(u, 0xD)));
+    game_set_word(g, F(y, 0x24), MOUNT_BRAIN);
+    uint16_t x = 0xFFF7; /* from the side away from the egg */
+    if (game_word(g, F(u, 7)) <= 0x97) {
+        game_poke(g, F(y, 0xF), (uint8_t)~game_peek(g, F(y, 0xF)));
+        game_poke(g, F(y, 0x14), (uint8_t)-game_peek(g, F(y, 0x14)));
+        x = 0x0123;
+    }
+    game_set_word(g, F(y, 7), x);
+    uint8_t a = game_peek(g, F(u, 0xB));
+    game_set_word(g, F(y, 0xA), a > 0xBB ? 0xA9 : a > 0x69 ? 0x68 : 0x45);
+    game_set_word(g, F(u, 0x2E), 0x7924);
+    return grow(g, u);
 }
 
 void eggs_collect(Game *g, uint16_t u, uint16_t x)
@@ -201,7 +269,21 @@ StepResult eggs_step(Game *g, uint16_t u, uint16_t at)
             return rest(g, u);
         game_poke(g, F(u, 0x2D), (uint8_t)(game_peek(g, F(u, 0x2D)) + 1));
         if (game_peek(g, 0xA0A1) >= game_peek(g, 0xA0A2)) return rest(g, u);
-        return STEP_UNPORTED; /* $76D0: hatching */
+        return hatch(g, u);
+    case GROWING: return grow(g, u);
+    case HATCHED: {
+        erase(g, u);
+        uint16_t rec = (uint16_t)(game_read_word(g, game_read_word(g, (uint16_t)(game_word(g, F(u, 0xD)) + 0x0A))) + 0x18);
+        game_set_word(g, F(u, 0x1C), rec);
+        display_fill(g, display_object(g, u, 1, 1), rec); /* $8E89 */
+        return task_sleep(g, 8, STANDING);
+    }
+    case STANDING:
+        display_fill(g, display_object(g, u, 1, 1), game_word(g, F(u, 0x1C)));
+        return task_sleep(g, 8, STANDING);
+    case TAKEN:
+        erase(g, u);
+        return task_end(g);
     }
     return STEP_UNPORTED;
 }

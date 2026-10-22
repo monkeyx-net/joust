@@ -61,6 +61,8 @@ add_library(joust_core STATIC
   src/sim/score.c
   src/sim/death.c
   src/sim/ptero.c
+  src/sim/points.c
+  src/sim/text.c
   src/emu/m6809.c
   src/emu/pia6821.c
   src/emu/board.c

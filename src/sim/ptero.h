@@ -18,7 +18,7 @@
  *     $67B3 off the side of the screen ($6808: its task ends)
  *   - killed ($74AE, +$10 of its table): brain $6828, the death: blinks
  *     ($6819-$6853), then its body as pixels in video RAM ($6895,
- *     $8209 from [$0038]), then the points ($7861: not ported)
+ *     $8209 from [$0038]), then its points ($7861: 1000)
  */
 #ifndef JOUST_PTERO_H
 #define JOUST_PTERO_H

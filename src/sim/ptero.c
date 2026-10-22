@@ -3,6 +3,7 @@
 #include "sim/brains.h"
 #include "sim/display.h"
 #include "sim/platform.h"
+#include "sim/points.h"
 #include "sim/rider.h"
 #include "sim/tasks.h"
 
@@ -14,6 +15,7 @@
 #define DYING_DARK 0x6844
 #define BODY_DRAWN 0x686B
 #define BODY_WAIT 0x687A
+#define BODY_GONE 0x688C
 
 #define LOOK 0x6640
 #define SWOOP 0x6695
@@ -27,7 +29,7 @@
 int ptero_ported(uint16_t at)
 {
     return at == START || at == START_CLEAR || at == FLYING || at == GONE || at == DYING_LIT ||
-           at == DYING_DARK || at == BODY_DRAWN || at == BODY_WAIT;
+           at == DYING_DARK || at == BODY_DRAWN || at == BODY_WAIT || at == BODY_GONE;
 }
 
 static uint16_t F(uint16_t u, int off) { return (uint16_t)(u + off); }
@@ -388,8 +390,11 @@ StepResult ptero_step(Game *g, uint16_t u, uint16_t at)
         if (!node) return STEP_UNPORTED;
         poke(g, node, 0x12);
         poke(g, F(node, 1), 0);
-        return task_sleep(g, 2, 0x688C); /* then the points ($7861): not ported */
+        return task_sleep(g, 2, BODY_GONE);
     }
+    case BODY_GONE: /* its points */
+        game_set_word(g, F(u, 0x2E), 0x0444);
+        return points_step(g, u, 0x7861);
     }
     return STEP_UNPORTED;
 }

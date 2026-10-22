@@ -365,8 +365,32 @@ named; `game` checks each (section 3).
   until it is slower than $FFE0 and still), or into the lava at line $E3
   (<$AA one enemy fewer, the task ends). At rest ($76A7 every 12 frames:
   pushed off, it falls again) +$2D counts down from $B1B7 to hatching
-  when <$A1 is below <$A2 ($76D0: <$A1 up, the sound $EF89, the knight's
-  task $8EAF; not ported). The picture ($78E3): by the speed index's sign
+  when <$A1 is below <$A2 ($76D0: <$A1 up, the sound $EF89, a mount's
+  task, $8EAF of type $F, flying in from the far side, x $FFF7 or $0123
+  by the egg's x against $97, at line $45, $68 or $A9 by its line, the
+  two linked by +$2B; the egg's task grows the knight through $7924's
+  records [frame][height][frames to the next], $7757, stands it, $7779
+  and $7792 every 8 frames, until the mount picks it up, $7887 erasing
+  it, or a player collects it). The mount's brain $793C: a hop ($7A5E, 4
+  frames of flap) to the knight's line when above it or over an edge
+  ahead ($AEB4/$AE90 + x against $E837 + line, bit 3), toward its x the
+  shorter way round, level with it (within 8 of 12 to the left) and
+  standing still under it 6 frames ($7A1F), then $7A2F: <$8E and +$34
+  up, the sound $EF8C, the knight's task to $7887, the table's first
+  brain (or +2's with two players), and $8D40: standing where it is.
+- **Points** (`sim/points.c`, $77AC-$78E2): a task prints a message
+  ($4AAD, `sim/text.c`: the strings at [$531F + 2n], the large font's
+  records at [$4BC6 + 2c], blitted solid, control $1A, in +$2F's colour)
+  at +$20 (from x and line by $788D, kept within column $88 and line $CE)
+  every 2nd frame for +$2D frames, then again in colour 0, adds the
+  platform bits under it to <$4B ($779B) and ends. $7861: points shown
+  for $1E frames (the pterodactyl's, $0444, after its body; the
+  gladiator bounty's). A collected egg's task becomes its points
+  ($77AC): erased; with two players a copy that shows the next number up
+  to 4 every $44 frames ($78B4/$78D1); after 2 frames a frame's wait
+  for each display of type 3 within 6 lines and 16 pixels (twice its
+  +$2D, at most 8, plus that one's wait), type 3 for $1E frames; caught in
+  the air (+$33), "500" too ($0222, 6 lines up, type 4). The picture ($78E3): by the speed index's sign
   the frames at $791E/$7921, one by vertical speed (rising, falling past
   $80, or between), offset into the records at [$0028], clipped at line
   $E0 ($D8F4).
@@ -402,7 +426,7 @@ named; `game` checks each (section 3).
   frames each, facing cleared for the last 4; then its body as pixels
   straight into video RAM ($6895, $8209: runs of nibble pairs from
   [$0038], drawn twice 2 frames apart, then 6 frames, three times), its
-  node's control set to $12, and the points ($7861, not ported).
+  node's control set to $12, and its points ($7861: $0444).
 - **A secret code** ($6B20-$6BA5, in `sim/flow.c`): during a game a task
   watches both players' controls ($6BA6) for $2502, then $1204, then
   $0506 (player 1 left+flap with start 1 and player 2 right; start 2 with
@@ -428,8 +452,7 @@ named; `game` checks each (section 3).
   -|line difference|, or by x when within 256, the last comparison by the
   second player's x byte against the first's measure). $7AD5 (<$8E below
   <$8F: one more brain running, +$34) and $7C90 jump to the table's +2.
-  Not ported: $793C (a riderless mount walking to its knight, $7A2F
-  picking it up).
+  $793C, a riderless mount's, is with the eggs below.
 - **Platforms** ($D9A3-$DC20, `sim/platform.c`): a platform's top under a
   rider ($B002 + x against $EA97 + line) lands it ($D9C2: its line set to
   $44, $50, $80, $89, $A2 or $D2 by the bits; the lava's line, $D9FC, is
@@ -503,7 +526,10 @@ named; `game` checks each (section 3).
   progress: about 2100 aiming at a player, 5000 swooping, 350 leaving)
   and its task step by step (1000 random flights and deaths, each step
   run to the ROM's sleep at $E15F: about 90000 steps, 1000 drawing its
-  body); $83D8 takes the pterodactyl's table too (60 killed).
+  body); $83D8 takes the pterodactyl's table too (60 killed); a
+  riderless mount's brain (20000 near its knight or not: about 700 pick
+  it up, 5600 hop); $77BE, points placed among two displays near them
+  (20000: about 9900 wait).
 - **MAME** (label `mame`): `mame_rom_map`, `mame_capture` (video RAM and
   palette decoding against MAME snapshots), `mame_images` (the blitter
   against MAME's, per image and mode); later per-frame RAM traces of

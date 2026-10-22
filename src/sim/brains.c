@@ -79,8 +79,8 @@ static uint8_t wall_ahead(const Game *g, uint16_t u, int right)
 
 int brain_enemy(Game *g, uint16_t u, uint16_t at)
 {
-    uint8_t a = 0, b = 0;
-    uint16_t d = 0, x = 0;
+    uint8_t a = 0, b = 0, flap = 0;
+    uint16_t d = 0, x = 0, y = 0;
     for (int guard = 0; guard < 64; guard++) {
         switch (at) {
         /* ---- the first family ---------------------------------------------- */
@@ -578,6 +578,108 @@ int brain_enemy(Game *g, uint16_t u, uint16_t at)
                  game_read(g, (uint16_t)(word(g, F(u, 0xA)) - 0x17C9))))
                 b = 1;
             controls(g, 0, b);
+            return 0;
+        /* ---- a riderless mount going for its knight (y, +$2B) ------------- */
+        case 0x793C:
+            y = word(g, F(u, 0x2B));
+            b = 0;
+            a = peek(g, F(y, 0xB));
+            if (a == peek(g, F(u, 0xB))) { at = 0x797F; break; }
+            if (a < peek(g, F(u, 0xB))) { at = 0x796A; break; }
+            if ((int8_t)peek(g, F(u, 0x11)) >= 2) { at = 0x796A; break; }
+            x = word(g, F(u, 7));
+            a = game_read(g, (uint16_t)(x - 0x514C));
+            if (peek(g, F(u, 0x14)) & 0x80) a = game_read(g, (uint16_t)(x - 0x5170));
+            b = 0;
+            a &= game_read(g, (uint16_t)(word(g, F(u, 0xA)) - 0x17C9));
+            if (!(a & 8)) { at = 0x797F; break; }
+            /* fall through */
+        case 0x796A: /* a hop */
+            b = 0;
+            if ((int8_t)peek(g, F(u, 0x11)) < -1) { at = 0x797F; break; }
+            game_set_word(g, F(u, 0x24), 0x7A5E);
+            game_poke(g, F(u, 0x2D), 4);
+            b = 1;
+            /* fall through */
+        case 0x797F: /* (b the flap, kept) */
+            flap = b;
+            d = (uint16_t)(word(g, F(y, 7)) + 0xFFF4 - word(g, F(u, 7)));
+            if (!(d & 0x8000)) { at = 0x79DC; break; }
+            d = (uint16_t)(d + 0x14);
+            if (d & 0x8000) { at = 0x79CB; break; }
+            game_poke(g, F(u, 0x2E), 1); /* level with it */
+            if (word(g, F(u, 0x20))) {
+                if (b > peek(g, F(u, 0xB))) { at = 0x79C4; break; } /* (CMPB: the flap against the line) */
+                a = peek(g, F(u, 0x14));
+                if (!a) { at = 0x7A12; break; }
+                at = a & 0x80 ? 0x79E6 : 0x79D5;
+                break;
+            }
+            a = peek(g, F(u, 0x14));
+            if (a & 0x80) { at = a == 0xFE ? 0x79ED : 0x79E6; break; }
+            if (a) { at = a == 2 ? 0x79ED : 0x79D5; break; }
+            at = peek(g, F(u, 0xF)) & 0x80 ? 0x79D5 : 0x79E6;
+            break;
+        case 0x79C4:
+            at = peek(g, F(u, 0x14)) & 0x80 ? 0x79D0 : 0x79E1;
+            break;
+        case 0x79CB:
+            if (peek(g, F(u, 0x2E))) { at = 0x79F3; break; }
+            /* fall through */
+        case 0x79D0:
+            if (peek(g, F(u, 0x14)) & 0x80) { at = 0x79ED; break; }
+            /* fall through */
+        case 0x79D5:
+            controls(g, 0xFF, flap);
+            return 0;
+        case 0x79DC:
+            if (peek(g, F(u, 0x2E))) { at = 0x79F3; break; }
+            /* fall through */
+        case 0x79E1:
+            if ((int8_t)peek(g, F(u, 0x14)) > 0) { at = 0x79ED; break; }
+            /* fall through */
+        case 0x79E6:
+            controls(g, 0x01, flap);
+            return 0;
+        case 0x79ED:
+            controls(g, 0, flap);
+            return 0;
+        case 0x79F3: /* the shorter way round the screen */
+            d = (uint16_t)(word(g, F(y, 7)) - word(g, F(u, 7)));
+            if (d & 0x8000) {
+                if ((int16_t)d <= (int16_t)0xFF69) d = (uint16_t)(d + 0x12E);
+            } else if ((int16_t)d >= 0x97) {
+                d = (uint16_t)(d - 0x12E);
+            }
+            at = d & 0x8000 ? 0x79D0 : 0x79E1;
+            break;
+        case 0x7A12: /* under it: 6 frames on, then pick it up */
+            game_set_word(g, F(u, 0x24), 0x7A1F);
+            game_poke(g, F(u, 0x2D), 6);
+            /* fall through */
+        case 0x7A1F:
+            if (dec(g, F(u, 0x2D))) {
+                controls(g, peek(g, F(u, 0xF)) & 0x80 ? 0xFF : 0x01, 0);
+                return 0;
+            }
+            /* $7A2F */
+            game_poke(g, 0xA08E, (uint8_t)(peek(g, 0xA08E) + 1));
+            game_poke(g, F(u, 0x34), (uint8_t)(peek(g, F(u, 0x34)) + 1));
+            game_sound(g, 0xEF8C);
+            x = word(g, F(u, 0x2B));
+            game_set_word(g, F(x, 5), 0x7887);
+            game_poke(g, F(x, 4), 1);
+            game_poke(g, F(x, 2), peek(g, F(x, 2)) & 0x7F);
+            x = word(g, F(u, 0xD));
+            game_set_word(g, F(u, 0x24), ram_word(g, peek(g, 0xA090) ? (uint16_t)(x + 2) : x));
+            return 1;
+        case 0x7A5E:
+            if (dec(g, F(u, 0x2D))) {
+                controls(g, 0, 1);
+                return 0;
+            }
+            game_set_word(g, F(u, 0x24), 0x793C);
+            controls(g, 0, 0);
             return 0;
         default:
             return -1;

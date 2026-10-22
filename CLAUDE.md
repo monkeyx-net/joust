@@ -101,13 +101,14 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   list's nodes, $E2A1-$E38C), `rider.c` (the riders: in the air,
   $8F04/$8F3D, landing, on the ground, $8D4D, taking off and falling off;
   the players' brains and $EEC2's), `wave.c` (the wave manager's frequent path, $6D91), `eggs.c` (eggs in
-  flight and at rest; hatching not yet), `spawn.c` (a rider appearing on a
+  flight and at rest, hatching), `spawn.c` (a rider appearing on a
   pad and waiting on it), `death.c` (a player's death, $8279), `score.c` (scores, extra lives, CMOS audits;
   the model keeps the CMOS and a faithful `DAA`), `brains.c` (the enemies' brains,
   $7A83-$80D5: state machines as basic blocks by ROM address; $80D6 the
   target), `platform.c` (landing on a platform, bouncing off one, $D9A3),
   `ptero.c` (the pterodactyl: start, brain, flight, death; $8209's pixels
-  are `display_pixels`); each mirrors a ROM routine's arithmetic exactly
+  are `display_pixels`), `points.c` (points shown where they were won),
+  `text.c` (the ROM's text printer, $4A50); each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
 - `web/` - page shell for the Emscripten build
@@ -162,7 +163,8 @@ Every change keeps `ctest` green.
   $A0, interrupts masked) from chosen RAM and registers until they return,
   against the C ones on the same RAM: $DC21, $83D8 with its outcome
   (unhorsings, eggs, pterodactyls), the display list's nodes, $80D6,
-  scoring, $D9A3 and the pterodactyl's brain (on a game in progress) on
+  scoring, $D9A3, the pterodactyl's and a riderless mount's brains and
+  points placed ($77BE) (on a game in progress) on
   20000 random cases each, and the pterodactyl's task step by step (each
   step run to its sleep, $E15F); RAM and the CMOS.
   Keep the random cases possible in the game (e.g. only players collect

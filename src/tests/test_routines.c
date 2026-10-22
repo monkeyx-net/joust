@@ -35,6 +35,11 @@
  *     sim/ptero.c) on the game in progress: random position, velocity,
  *     targets, countdowns, push, the player's line, out or missing; all of
  *     RAM, or both off the screen ($6808)
+ *   - a riderless mount's brain ($793C, $7A1F, $7A5E, sim/brains.c): near
+ *     its knight or not, level or not, on the ground or flying; all of
+ *     RAM, and picking it up (to $8D40) or not
+ *   - $77BE, points placed (sim/points.c) among two displays near them
+ *     on the task list: all of RAM after the step
  *   - the pterodactyl's task step by step (to the sleep, $E15F) from a
  *     random flight or its death ($6828), through the body's pixels, to
  *     the points; all of RAM after each step
@@ -51,6 +56,7 @@
 #include "sim/display.h"
 #include "sim/game.h"
 #include "sim/platform.h"
+#include "sim/points.h"
 #include "sim/ptero.h"
 #include "sim/score.h"
 
@@ -538,6 +544,89 @@ static void ptero_step_cases(void)
     printf("test_routines: the pterodactyl's steps: %d cases, %ld steps, %ld drawing its body\n", CASES / 20, steps, bodies);
 }
 
+/* a riderless mount's brain ($793C, $7A1F, $7A5E) going for its knight */
+static void mount_cases(void)
+{
+    static const uint16_t states[] = { 0x793C, 0x793C, 0x7A1F, 0x7A5E };
+    long picked = 0, hops = 0;
+    for (int i = 0; i < CASES; i++) {
+        memcpy(board.ram, base, sizeof base);
+        for (int k = 7; k < 0x38; k++) board.ram[TASK_U + k] = board.ram[TASK_X + k] = (uint8_t)rnd();
+        board.ram[TASK_X + 2] = 0x82;
+        poke_word(TASK_U + 0x2B, TASK_X);
+        poke_word(TASK_U + 0xD, (uint16_t)(0x8981 + 0x31 * (rnd() % 3)));
+        poke_word(TASK_U + 0x24, states[rnd() % 4]);
+        int ux = (int)(rnd() % 0x130) - 8, near = rnd() % 2;
+        poke_word(TASK_U + 7, (uint16_t)ux);
+        poke_word(TASK_X + 7, (uint16_t)(near ? ux + (int)(rnd() % 0x30) - 0x18 : (int)(rnd() % 0x130) - 8));
+        poke_word(TASK_U + 0xA, (uint16_t)(0x30 + rnd() % 0xA8));
+        poke_word(TASK_X + 0xA, (uint16_t)(rnd() % 3 ? board.ram[TASK_U + 0xB] : 0x30 + rnd() % 0xA8));
+        poke_word(TASK_U + 0x11, (uint16_t)((int)(rnd() % 0x600) - 0x300));
+        board.ram[TASK_U + 0x14] = (uint8_t)(((int)(rnd() % 9) - 4) * 2);
+        board.ram[TASK_U + 0xF] = (uint8_t)(rnd() % 2 ? 0 : 0xFF);
+        if (rnd() % 2) poke_word(TASK_U + 0x20, 0);
+        board.ram[TASK_U + 0x2E] = (uint8_t)(rnd() % 2);
+        board.ram[TASK_U + 0x2D] = (uint8_t)(1 + rnd() % 7);
+        board.ram[0xA090] = (uint8_t)(rnd() % 2);
+        sync_model();
+        board.cpu.u = TASK_U;
+        uint16_t end = call(board.ram[TASK_U + 0x24] << 8 | board.ram[TASK_U + 0x25], 0x8D40);
+        int c = brain_enemy(&model, TASK_U, (uint16_t)(model.ram[TASK_U + 0x24] << 8 | model.ram[TASK_U + 0x25]));
+        if (end != RETURN && end != 0x8D40) {
+            if (failures++ < 8) fprintf(stderr, "test_routines: mount case %d did not return\n", i);
+            continue;
+        }
+        picked += end == 0x8D40;
+        hops += board.ram[TASK_U + 0x24] == 0x7A && board.ram[TASK_U + 0x25] == 0x5E;
+        long d = first_difference();
+        if ((c != (end == 0x8D40) || d >= 0 || (c == 0 && board.cpu.a != model.ram[0xA032])) && failures++ < 8)
+            fprintf(stderr, "test_routines: mount case %d: ROM %d, C %d, $%04lX = %02X, C %02X\n", i, end == 0x8D40, c, d,
+                    d >= 0 ? board.ram[d] : 0, d >= 0 ? model.ram[d] : 0);
+    }
+    printf("test_routines: the riderless mount's brain: %d cases, %ld picking up the knight, %ld hopping\n", CASES, picked,
+           hops);
+}
+
+/* $77BE: points placed, waiting for the displays near them (two on the list, type 3 or 4) */
+static void points_cases(void)
+{
+    long waits = 0;
+    for (int i = 0; i < CASES; i++) {
+        memcpy(board.ram, base, sizeof base);
+        uint16_t t1 = (uint16_t)(board.ram[0xA00A] << 8 | board.ram[0xA00B]);
+        uint16_t t2 = (uint16_t)(board.ram[t1] << 8 | board.ram[t1 + 1]);
+        if (t2 == TASK_X || t2 == 0xA500 || t2 == TASK_U || t1 == TASK_X || t1 == 0xA500 || t1 == TASK_U) continue;
+        poke_word(t2, TASK_X);
+        poke_word(TASK_X, 0xA500);
+        poke_word(0xA500, 0);
+        for (int k = 2; k < 0x38; k++) board.ram[TASK_U + k] = board.ram[TASK_X + k] = board.ram[0xA500 + k] = (uint8_t)rnd();
+        int x = (int)(rnd() % 0x130) - 8, line = 0x20 + (int)(rnd() % 0xC0);
+        poke_word(TASK_U + 7, (uint16_t)x);
+        poke_word(TASK_U + 0xA, (uint16_t)line);
+        for (uint16_t t = TASK_X; t <= 0xA500; t += 0x100) {
+            board.ram[t + 2] = (uint8_t)(rnd() % 4 ? 3 : 4);
+            poke_word((uint16_t)(t + 7), (uint16_t)(x + (int)(rnd() % 0x28) - 0x14));
+            poke_word((uint16_t)(t + 0xA), (uint16_t)(line + (int)(rnd() % 0x10) - 8));
+            board.ram[t + 0x2D] = (uint8_t)(rnd() % 0x20);
+            board.ram[t + 0x32] = (uint8_t)(rnd() % 8);
+        }
+        poke_word(0xA02E, TASK_U);
+        sync_model();
+        board.cpu.u = TASK_U;
+        uint16_t end = call(0x77BE, 0xE15F);
+        StepResult r = points_step(&model, TASK_U, 0x77BE);
+        if (end != 0xE15F || r != STEP_DONE) {
+            if (failures++ < 8) fprintf(stderr, "test_routines: points case %d did not sleep\n", i);
+            continue;
+        }
+        waits += board.ram[TASK_U + 0x32] > 1;
+        long d = first_difference();
+        if (d >= 0 && failures++ < 8)
+            fprintf(stderr, "test_routines: points case %d: $%04lX = %02X, C %02X\n", i, d, board.ram[d], model.ram[d]);
+    }
+    printf("test_routines: points placed: %d cases, %ld waiting for others\n", CASES, waits);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -568,6 +657,8 @@ int main(int argc, char **argv)
     platform_cases();
     ptero_cases();
     ptero_step_cases();
+    mount_cases();
+    points_cases();
     if (failures) {
         fprintf(stderr, "test_routines: %d differences\n", failures);
         return 1;

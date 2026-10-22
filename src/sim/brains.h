@@ -10,16 +10,20 @@
  * +$2B-2C a remembered line or velocity, +$2D a countdown, +$2E/+$2F a
  * turn, +$32 frames to the next look at a target, and $80D6 for the
  * nearer player (<$73, <$75; <$A8/<$A9 say who is out). $7AD5 and $7C90
- * jump to the start in the rider's table (+2). Not ported yet: $793C (a
- * riderless mount walking to its knight, picking it up at $7A2F).
+ * jump to the start in the rider's table (+2). $793C: a riderless mount
+ * (from a hatched egg) going for its knight (+$2B): hopping ($7A5E) to
+ * its line or over an edge, the shorter way round the screen, then under
+ * it for 6 frames ($7A1F) and picking it up ($7A2F: <$8E and +$34 up,
+ * the sound $EF8C, the knight's task to $7887, the table's first brain,
+ * or +2's in a two-player game).
  */
 #ifndef JOUST_BRAINS_H
 #define JOUST_BRAINS_H
 
 #include "sim/game.h"
 
-/* Run the brain state at `at` for the rider at u: 0 controls set, -1 a
-   state not ported. */
+/* Run the brain state at `at` for the rider at u: 0 controls set, 1 it
+   picked up its knight (the step goes on at $8D40), -1 a state not ported. */
 int brain_enemy(Game *g, uint16_t u, uint16_t at);
 /* $80D6: the player to go for: 1 and *x its block, or 0 (*x as the ROM leaves X). */
 int brain_target(Game *g, uint16_t u, uint16_t *x);

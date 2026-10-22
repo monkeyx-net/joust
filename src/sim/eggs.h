@@ -7,9 +7,12 @@
  * index slowed by 2, and a falling egg bounces up at a quarter of its
  * speed until it is slow and still), or the lava's line ($E3: lost, one
  * enemy fewer, <$AA). At rest ($76A7 every 12 frames) +$2D counts down
- * ($B1B7 frames) to hatching, when <$A1 is below <$A2 ($76D0: the
- * knight's task $8EAF, not ported); an egg pushed off its platform falls
- * again. Its picture ($78E3): a frame by its facing and vertical speed
+ * ($B1B7 frames) to hatching, when <$A1 is below <$A2 ($76D0: <$A1 up,
+ * the sound $EF89, a mount's task, $8EAF of type $F with brain $793C,
+ * flying in from the far side at the line of the egg's third, the two
+ * linked by +$2B; the egg's task grows the knight through $7924's frames,
+ * $7757, then stands it, $7779/$7792, until the mount picks it up, $7887,
+ * or a player collects it); an egg pushed off its platform falls again. Its picture ($78E3): a frame by its facing and vertical speed
  * from the records at [$0028], clipped at the lava ($D8F4).
  */
 #ifndef JOUST_EGGS_H
@@ -19,6 +22,10 @@
 
 int eggs_ported(uint16_t at);
 StepResult eggs_step(Game *g, uint16_t task, uint16_t at);
+/* $6AF3: the erase node of the picture at +$1C, if any (+$1C cleared) */
+void eggs_erase(Game *g, uint16_t u);
+/* $779B: the platform bits at its x and line into <$4B */
+void eggs_walls(Game *g, uint16_t u);
 /* $74C3: the rider at u unhorsed by `winner` (0 for none) lays an egg */
 void eggs_lay(Game *g, uint16_t u, uint16_t winner);
 /* $753B: the egg at x collected by the rider at u */
