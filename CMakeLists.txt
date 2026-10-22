@@ -37,6 +37,7 @@ add_library(joust_core STATIC
   src/assets/assets.c
   src/assets/images.c
   src/assets/savefile.c
+  src/assets/extract.c
   src/gfx/fb.c
   src/gfx/blit.c
   src/gfx/scale.c
@@ -177,6 +178,10 @@ if(EXISTS "${JOUST_ROM}")
   add_test(NAME frame COMMAND test_frame "${JOUST_ROM}")
   add_test(NAME frame_two COMMAND test_frame "${JOUST_ROM}" two)
   set_tests_properties(frame frame_two PROPERTIES LABELS rom TIMEOUT 600)
+  add_executable(test_extract src/tests/test_extract.c)
+  target_link_libraries(test_extract PRIVATE joust_core)
+  add_test(NAME extract COMMAND test_extract "${JOUST_ROM}" "${CMAKE_BINARY_DIR}/extract_test")
+  set_tests_properties(extract PROPERTIES LABELS rom)
   message(STATUS "ROM set found at ${JOUST_ROM}: ROM tests enabled")
 else()
   message(STATUS "No ROM set at ${JOUST_ROM}: ROM tests disabled (put joust.zip in roms/)")

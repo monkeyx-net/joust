@@ -49,7 +49,8 @@ ctest --test-dir build -L rom                     # tests needing the ROM set (r
 ctest --test-dir build -L mame                    # tests needing MAME + the ROM set
 build/joust --windowed                            # play (finds roms/joust.zip in dev builds)
 build/joust --windowed --test-card                # the test card and image pages
-build/joust --windowed --c-game                   # the game in C (sim/), the board only for sound
+build/joust --windowed --c-game                   # the game in C (sim/), from assets/ (extracted once)
+build/joust --extract roms/joust.zip [dir]        # program, factory CMOS and sounds into assets/
 build/joust --windowed --gfx hd-glow              # enhanced graphics (presets: classic ... hd-glow-crt)
 SDL_VIDEODRIVER=dummy build/joust --frames 60 --screenshot out.png   # headless screenshot
 build/joust --check-rom roms/joust.zip            # verify a ROM set
@@ -84,7 +85,8 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   presets, HD image registry, whole-frame filter, glow), `debugfont.c` (3x5
   font for diagnostics, not the ROM's), `williams.c` (video RAM and palette
   decoding, the SC1 blitter as MAME emulates it)
-- `assets/` - `savefile.c` (the save folder: joust.cmos), `rom.c` (the joust set from a zip or folder, matched by CRC;
+- `assets/` - `extract.c` (`--extract`: what the C game needs, from the ROM
+  set once), `savefile.c` (the save folder: joust.cmos), `rom.c` (the joust set from a zip or folder, matched by CRC;
   CPU address map), `images.c` (the image catalogue: ROM addresses and
   sizes, decoded through the blitter and the ROM's palette), `zip.c`,
   `inflate.c`, `png.c` (RGB and RGBA), `assets.c` (asset folder lookup)
@@ -141,6 +143,10 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
 Every change keeps `ctest` green.
 
 - `enhance` - always runs (scalers, presets, blitter at scale 2, glow)
+- `extract` - label `rom`: the extractor (assets/extract.c) is repeatable,
+  its program image is the ROM by address, its CMOS the factory settings,
+  every sounding command has a WAV, and the C game from it equals the one
+  from the ROM set
 - `rom_load` - label `rom`: loads the set from the zip, from renamed copies
   in a folder (CRC matching), and fails cleanly on an empty folder
 - `mame_rom_map` - label `mame`: MAME's view of the main CPU's ROM

@@ -50,6 +50,7 @@ Pads use SDL's game controller database; set `JOUST_GAMECONTROLLERDB` to a
 build/joust [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N]
             [--c-game] [--input script.txt] [--frames N] [--screenshot out.png]
 build/joust --check-rom roms/joust.zip            # verify a ROM set
+build/joust --extract roms/joust.zip [dir]        # what --c-game needs, into assets/
 build/joust --dump-rom roms/joust.zip D000 D0FF   # main-CPU ROM bytes, "ADDR BYTE" hex
 build/joust --list-images                         # the image catalogue, ADDR:W:H
 ```
@@ -59,8 +60,11 @@ build/joust --list-images                         # the image catalogue, ADDR:W:
 - `--test-card`: ROM status, an input tester, the presets, and pages of the
   images decoded from the ROM (`--page N`, or Select + R1 / F2 to step).
 - `--c-game`: the game rewritten in C (`src/sim/`) instead of the
-  emulated main CPU, from the end of the power-on (the emulated sound
-  board still plays the sounds; the operator's test mode is not there yet).
+  emulated board. It runs from `assets/` (the program image, factory
+  settings and sounds, extracted once from your ROM set with `--extract`,
+  or automatically on the first `--c-game` with the set present); then
+  the ROM set is no longer needed. The operator's test mode is not there
+  yet.
 - `--input`, `--frames`, `--screenshot`: scripted, headless runs
   (`SDL_VIDEODRIVER=dummy`); see the comment at the top of `src/main.c`.
 
@@ -158,6 +162,7 @@ ctest --test-dir build -L mame      # needs MAME 0.289 and the ROM set
 
 - `enhance` (always): scalers, presets, glow.
 - `rom_load` (`rom`): the loader, from the zip and from renamed files.
+- `extract` (`rom`): the extractor, and the C game from its output.
 - `game`, `game_runner`, `game_two` (`rom`): every task step of three
   scripted games run in C against the emulated board's, byte for byte.
 - `routines` (`rom`): ROM routines and task steps on random inputs against

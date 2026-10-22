@@ -10,6 +10,7 @@
  *         [--input script.txt] [--frames N] [--screenshot out.png]
  *   joust --check-rom <dir|zip>
  *   joust --dump-rom <dir|zip> <first> <last>
+ *   joust --extract <dir|zip> [<asset dir>]
  *   joust --list-images
  *
  * --frames N stops after N updates; with --screenshot the last frame is
@@ -17,6 +18,9 @@
  * --input replays scripted controls: lines of "<frame> [coin] [start] [start2]
  * [left] [right] [flap] [left2] [right2] [flap2] [menu]", each holding from
  * that frame until the next line (live controls still quit).
+ * --extract writes what the C game needs from the ROM set to an assets folder
+ * (assets/extract.h; default: assets/ next to the program); --c-game then
+ * runs from it alone (extracting it first if the ROM set is there).
  * --dump-rom prints "ADDR BYTE" lines (hex) for main-CPU addresses first..last,
  * the format the MAME probe writes (src/tests/mame/rom_map_probe.lua).
  * --list-images prints the image catalogue as "ADDR:W:H name" (hex address,
@@ -27,6 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "assets/assets.h"
+#include "assets/extract.h"
 #include "assets/images.h"
 #include "assets/png.h"
 #include "assets/rom.h"
@@ -101,6 +107,10 @@ typedef struct {
     uint8_t cmos_saved[BOARD_CMOS_SIZE];
     int64_t c_frame;     /* frames since the switch (the sound board's clock) */
     int64_t c_base;      /* the board's frame at the switch */
+    int c_assets;        /* running from the extracted assets: no ROM set, no board */
+    char assets_dir[1024];
+    int sound_ids[EXTRACT_SOUND_COMMANDS];
+    int sounds_loaded;
 } App;
 
 static App g;
@@ -228,7 +238,82 @@ static void draw_images(Framebuffer *t)
 static void c_sound(void *user, uint8_t command)
 {
     (void)user;
-    sound_command(&g.board.sound, (uint8_t)(command | 0xC0)); /* (as the board's PIA latches it) */
+    if (!g.c_assets) {
+        sound_command(&g.board.sound, (uint8_t)(command | 0xC0)); /* (as the board's PIA latches it) */
+        return;
+    }
+    uint8_t cmd = command & 0x3F; /* the extracted sound for it, a new one over the last */
+    if (cmd < EXTRACT_SOUND_COMMANDS && g.sound_ids[cmd] >= 0) audio_play(g.sound_ids[cmd]);
+}
+
+/* The extracted sounds, once audio is open. */
+static void c_sounds_load(void)
+{
+    if (!g.c_assets || g.sounds_loaded) return;
+    g.sounds_loaded = 1;
+    for (int c = 0; c < EXTRACT_SOUND_COMMANDS; c++) {
+        char name[16];
+        snprintf(name, sizeof name, "%02X.wav", c);
+        g.sound_ids[c] = audio_load(name, 1, 0.8f);
+    }
+}
+
+static int read_all(const char *dir, const char *name, void *buf, size_t size)
+{
+    char path[1200];
+    snprintf(path, sizeof path, "%s/%s", dir, name);
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    size_t n = fread(buf, 1, size, f);
+    fclose(f);
+    return n == size ? 0 : -1;
+}
+
+/* The assets folder for --c-game: found, or extracted from the ROM set
+   next to the program on a first start. 0 when they are there. */
+static int c_assets_open(const char *argv0)
+{
+    if (!assets_find(argv0, EXTRACT_MANIFEST, g.assets_dir, sizeof g.assets_dir)) return 0;
+    if (!g.rom.loaded) return -1;
+    char dir[1024], err[512];
+    snprintf(dir, sizeof dir, "%s", argv0);
+    char *slash = strrchr(dir, '/');
+#ifdef _WIN32
+    char *bslash = strrchr(dir, '\\');
+    if (bslash > slash) slash = bslash;
+#endif
+    if (slash) snprintf(slash, sizeof dir - (size_t)(slash - dir), "/assets");
+    else snprintf(dir, sizeof dir, "assets");
+    printf("joust: extracting the assets to %s (once)\n", dir);
+    if (extract_all(&g.rom, dir, err, sizeof err)) {
+        fprintf(stderr, "joust: %s\n", err);
+        return -1;
+    }
+    return assets_find(argv0, EXTRACT_MANIFEST, g.assets_dir, sizeof g.assets_dir);
+}
+
+static void c_picture(void *user, const Game *cg);
+
+/* The C game from the assets alone: the program, the CMOS (saved, or the
+   factory settings), the sounds as WAVs. */
+static int c_start_assets(void)
+{
+    if (read_all(g.assets_dir, EXTRACT_PROGRAM, g.rom_flat, sizeof g.rom_flat)) return -1;
+    if (save_load(CMOS_FILE, g.cg.cmos, sizeof g.cg.cmos)) {
+        if (read_all(g.assets_dir, EXTRACT_CMOS, g.cg.cmos, sizeof g.cg.cmos)) return -1;
+        g.board.cmos_dirty = 1;
+        memcpy(g.board.cmos, g.cg.cmos, sizeof g.board.cmos);
+    }
+    memcpy(g.cmos_saved, g.cg.cmos, sizeof g.cmos_saved);
+    g.cg.rom = g.rom_flat;
+    g.cg.on_sound = c_sound;
+    cgame_power_on(&g.cg);
+    g.cgd.g = &g.cg;
+    g.cgd.picture = c_picture;
+    for (int c = 0; c < EXTRACT_SOUND_COMMANDS; c++) g.sound_ids[c] = -1;
+    g.c_assets = 1;
+    g.c_ready = 1;
+    return 0;
 }
 
 static void c_picture(void *user, const Game *cg)
@@ -267,6 +352,7 @@ static void c_step(const InputFrame *in)
     cg->in0 = (uint8_t)((in->start ? IN0_START1 : 0) | (in->start2 ? IN0_START2 : 0));
     cg->in2 = (uint8_t)((in->coin ? IN2_COIN1 : 0) | (in->menu_held ? IN2_ADVANCE : 0));
     g.board.sound.out_len = 0;
+    c_sounds_load();
     if (!g.c_stopped) {
         uint16_t task = 0;
         if (cgame_frame(&g.cgd, &task) != FRAME_DONE) {
@@ -276,8 +362,10 @@ static void c_step(const InputFrame *in)
         }
     }
     g.c_frame++;
-    int64_t main_cycles = (g.c_base + g.c_frame) * (int64_t)(BOARD_LINES * BOARD_CYCLES_PER_LINE);
-    sound_run(&g.board.sound, (int64_t)((double)main_cycles * SOUND_CPU_HZ / 1e6));
+    if (!g.c_assets) {
+        int64_t main_cycles = (g.c_base + g.c_frame) * (int64_t)(BOARD_LINES * BOARD_CYCLES_PER_LINE);
+        sound_run(&g.board.sound, (int64_t)((double)main_cycles * SOUND_CPU_HZ / 1e6));
+    }
     if (memcmp(cg->cmos, g.cmos_saved, sizeof g.cmos_saved)) {
         memcpy(g.board.cmos, cg->cmos, sizeof g.board.cmos);
         g.board.cmos_dirty = 1;
@@ -475,6 +563,30 @@ static int dump_rom(const char *path, const char *first, const char *last)
     return 0;
 }
 
+static int extract(const char *argv0, const char *rom_path, const char *out_dir)
+{
+    static RomSet rom;
+    char err[512], dir[1024];
+    if (out_dir) snprintf(dir, sizeof dir, "%s", out_dir);
+    else if (getenv("JOUST_ASSETS")) snprintf(dir, sizeof dir, "%s", getenv("JOUST_ASSETS"));
+    else {
+        snprintf(dir, sizeof dir, "%s", argv0);
+        char *slash = strrchr(dir, '/');
+#ifdef _WIN32
+        char *bslash = strrchr(dir, '\\');
+        if (bslash > slash) slash = bslash;
+#endif
+        if (slash) snprintf(slash, sizeof dir - (size_t)(slash - dir), "/assets");
+        else snprintf(dir, sizeof dir, "assets");
+    }
+    if (rom_load(&rom, rom_path, err, sizeof err) || extract_all(&rom, dir, err, sizeof err)) {
+        fprintf(stderr, "joust: %s\n", err);
+        return 1;
+    }
+    printf("joust: assets extracted to %s\n", dir);
+    return 0;
+}
+
 static int save_screenshot(const char *path)
 {
     static uint8_t rgba[FB_HEIGHT * FB_MAX_SCALE * FB_WIDTH * FB_MAX_SCALE * 4];
@@ -600,6 +712,7 @@ int main(int argc, char **argv)
     const char *rom_arg = NULL;
     if (argc == 3 && !strcmp(argv[1], "--check-rom")) return check_rom(argv[2]);
     if (argc == 5 && !strcmp(argv[1], "--dump-rom")) return dump_rom(argv[2], argv[3], argv[4]);
+    if ((argc == 3 || argc == 4) && !strcmp(argv[1], "--extract")) return extract(argv[0], argv[2], argc == 4 ? argv[3] : NULL);
     if (argc == 2 && !strcmp(argv[1], "--list-images")) {
         for (int i = 0; i < ROM_IMAGE_COUNT; i++)
             printf("%04X:%d:%d %s\n", ROM_IMAGES[i].addr, ROM_IMAGES[i].w, ROM_IMAGES[i].h, ROM_IMAGES[i].name);
@@ -627,8 +740,9 @@ int main(int argc, char **argv)
                     "          [--input script.txt] [--frames N] [--screenshot out.png]\n"
                     "       %s --check-rom <dir|zip>\n"
                     "       %s --dump-rom <dir|zip> <first> <last>\n"
+                    "       %s --extract <dir|zip> [<asset dir>]\n"
                     "       %s --list-images\n",
-                    argv[0], argv[0], argv[0], argv[0]);
+                    argv[0], argv[0], argv[0], argv[0], argv[0]);
             return 2;
         }
     }
@@ -651,8 +765,12 @@ int main(int argc, char **argv)
     }
     if (g.page < 0 || g.page > g.image_pages) g.page = 0;
     if (g.page) g.test_card = 1;
-    if (!g.rom.loaded) g.test_card = 1; /* nothing to run: show why */
-    if (!g.test_card) board_start();
+    if (g.c_game && !g.test_card && !c_assets_open(argv[0]) && !c_start_assets()) {
+        /* the C game from the assets: no ROM set needed */
+    } else {
+        if (!g.rom.loaded) g.test_card = 1; /* nothing to run: show why */
+        if (!g.test_card) board_start();
+    }
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0) {
         SDL_Log("SDL_Init: %s", SDL_GetError());

@@ -421,7 +421,12 @@ named; `game` checks each (section 3).
   the last band of the list before, then the picture) and after the
   passes (lines $40, $80, $C0: the list's first bands), so the second
   pass always runs to the end; sound commands to the emulated sound
-  board; the CMOS saved as the board's. 30000 frames of scripted play and
+  board, or with the extracted assets (`joust --extract`, `assets/
+  extract.h`: data/program.bin, the main CPU's ROM by address; data/
+  cmos.bin, the factory settings; sounds/NN.wav per command, recorded
+  from the emulated sound board) their WAVs, the ROM set then not needed
+  (a first `--c-game` with the ROM set extracts them next to the program);
+  the CMOS saved as the board's. 30000 frames of scripted play and
   attract mode run with no step left to the ROM (about 1200 frames a
   second, headless). Not ported: the test mode (the advance switch).
 - **Burning and the lava's fire** (`sim/burn.c`): $81A0 (a platform
@@ -623,8 +628,10 @@ named; `game` checks each (section 3).
 
 - **Unit** (`ctest`, no ROM): scalers, presets, blitter, glow (`enhance`);
   the sim's pieces as they arrive.
-- **ROM** (label `rom`): the loader (`rom_load`); later the extractor's
-  output (as Defender's `extract`).
+- **ROM** (label `rom`): the loader (`rom_load`); the extractor (`extract`:
+  repeatable, the program image the ROM by address, the CMOS the factory
+  settings, a WAV for each sounding command, and the C game from the
+  assets alone equal to the one from the ROM set over 3000 frames).
 - **Task steps** (label `rom`): `game` keeps a C model of all of RAM
   (`sim/game.h`) on the board's scripted game: the board's writes (the
   CPU's and the blitter's) are copied to it, except during a ported task
@@ -706,7 +713,7 @@ named; `game` checks each (section 3).
 | E1 | (done 2026-10-20) Emulated board: 6809 core, main board, sound board; the game plays from the player's ROM with sound | `mame_emu`: 20000 random-state changes and three frames equal MAME's; instruction traces of frames 600-900 matched cycle for cycle |
 | E2 | Polish: HD presets drawing upscaled sprites from the board's blit list, settings persistence, web build with IndexedDB CMOS, device testing | Device checklist |
 | P2-P5 | (superseded: the PRNG and kernel notes became S0's start) The first plan for a C game, from MAME alone | - |
-| X1 | Extractor (`joust --extract`, as Defender's `src/assets/extract.c`): the images (the catalogue, decoded through the blitter), fonts, palette and sounds (WAVs recorded from the emulated sound board) to `assets/`, then the game's tables as the C game needs them | `extract`; the C game runs from `assets/` alone |
+| X1 | (2026-10-22: program, factory CMOS, sounds; `--c-game` runs from the assets alone) Extractor (`joust --extract`, as Defender's `src/assets/extract.c`): the images (the catalogue, decoded through the blitter), fonts, palette and sounds (WAVs recorded from the emulated sound board) to `assets/`, then the game's tables as the C game needs them | `extract`; the C game runs from `assets/` alone |
 | S0 | (started 2026-10-21) The C game's foundation: a model of all of RAM (`sim/game.c`), the task kernel (`sim/tasks.c`), the `game` and `routines` harnesses; first tasks: the ROM check (`checksum.c`), the lava (`lava.c`), the collision walks and tests (`collide.c`) | `game`, `routines` |
 | S1 | Task steps in C: the players (flap, gravity, running, braking, the joust's outcome), enemies (Bounders, Hunters, Shadow Lords), eggs and hatching, the pterodactyl, the troll's hand, platforms, waves and their tables, scoring, extra lives, two players | `game` on scripted games (and a second, longer one), `routines` |
 | I1 | (done 2026-10-22: `sim/irq.c`; the test mode's entry not ported) The interrupt in C: the display lists to the blitter (the C game draws with `gfx/williams.c`'s blitter into video RAM laid out as the arcade's), the random stir, the controls and coins | Each routine checked per call (as Defender's) |
