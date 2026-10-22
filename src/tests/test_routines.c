@@ -40,6 +40,9 @@
  *     RAM, and picking it up (to $8D40) or not
  *   - $77BE, points placed (sim/points.c) among two displays near them
  *     on the task list: all of RAM after the step
+ *   - the wave task (sim/waves.c) from a wave's end through the next
+ *     wave's start, step by step, on every wave record and ending, the
+ *     settings' countdowns and the CMOS difficulty at random
  *   - the pterodactyl's task step by step (to the sleep, $E15F) from a
  *     random flight or its death ($6828), through the body's pixels, to
  *     the points; all of RAM after each step
@@ -627,6 +630,74 @@ static void points_cases(void)
     printf("test_routines: points placed: %d cases, %ld waiting for others\n", CASES, waits);
 }
 
+/* the wave task from a wave's end through the next wave's start (every
+   record of $7173-$719B, the endings, lava bridges and flames, one or two
+   players), step by step; the tasks after it are taken off the list
+   before each step, as if gone */
+static void waves_cases(void)
+{
+    static const uint16_t endings[] = { 0x71C8, 0x7236, 0x7274, 0x72D2 };
+    uint16_t w = 0;
+    for (uint16_t t = (uint16_t)(base[0xA00A] << 8 | base[0xA00B]); t; t = (uint16_t)(base[t] << 8 | base[t + 1]))
+        if (base[t + 5] == 0x6D && base[t + 6] == 0x91) w = t;
+    if (!w) {
+        if (failures++ < 8) fprintf(stderr, "test_routines: no wave task in the game at frame 2000\n");
+        return;
+    }
+    long steps = 0, platforms = 0, eggs = 0, done = 0;
+    for (int i = 0; i < CASES / 50; i++) {
+        memcpy(board.ram, base, sizeof base);
+        poke_word((uint16_t)(w + 7), (uint16_t)(0x7173 + 4 * (rnd() % 10)));
+        poke_word((uint16_t)(w + 0x13), endings[rnd() % 4]);
+        board.ram[0xA0AA] = 0;
+        board.ram[0xA09F] = (uint8_t)(rnd() % 3 ? 0 : 1 + rnd() % 2);
+        board.ram[0xA0A0] = (uint8_t)(rnd() % 3 ? 0 : 1 + rnd() % 2);
+        board.ram[0xA09E] = (uint8_t)(rnd() % 0x99);
+        board.ram[0xA052] = (uint8_t)(rnd() % 2);
+        board.ram[0xA05C] = (uint8_t)(rnd() % 2);
+        for (uint16_t a = 0xA0A3; a <= 0xA0A6; a++) board.ram[a] = (uint8_t)(rnd() % 2 ? 0 : 0xFF);
+        if (rnd() % 8 == 0) board.ram[0xA090] = 0;
+        for (uint16_t a = 0xB1AF; a < 0xB1AD + 3 * 28; a += 3) board.ram[a] = (uint8_t)(rnd() % 3);
+        board.ram[0xA09B] = (uint8_t)(0xD8 + rnd() % 0x28);
+        board.cmos[0x14] = 0xF0;
+        board.cmos[0x15] = (uint8_t)(0xF0 | rnd() % 10); /* the difficulty */
+        board.ram[w + 1] = board.ram[w] = 0;
+        poke_word((uint16_t)(w + 5), 0x6D91);
+        for (int n = 0; n < 800; n++) {
+            uint16_t at = (uint16_t)(board.ram[w + 5] << 8 | board.ram[w + 6]);
+            if (n && at == 0x6D91) {
+                done++;
+                break;
+            }
+            board.ram[w] = board.ram[w + 1] = 0;
+            poke_word(0xA02E, w);
+            poke_word(0xA02A, 0xAA00);
+            sync_model();
+            board.cpu.u = w;
+            uint16_t end = call(at, 0xE15F);
+            StepResult r = game_step(&model, w);
+            if (end != 0xE15F || r != STEP_DONE) {
+                if (failures++ < 8)
+                    fprintf(stderr, "test_routines: wave case %d at $%04X: ROM %s, C %s\n", i, at,
+                            end == 0xE15F ? "slept" : "did not sleep", r == STEP_DONE ? "slept" : "not ported");
+                break;
+            }
+            steps++;
+            platforms += at == 0x6F9B;
+            eggs += at == 0x7480;
+            long d = first_difference();
+            if (d >= 0) {
+                if (failures++ < 8)
+                    fprintf(stderr, "test_routines: wave case %d at $%04X: $%04lX = %02X, C %02X\n", i, at, d, board.ram[d],
+                            model.ram[d]);
+                break;
+            }
+        }
+    }
+    printf("test_routines: the waves: %d cases, %ld steps, %ld back at the manager, %ld after a platform, %ld eggs\n",
+           CASES / 50, steps, done, platforms, eggs);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -659,6 +730,7 @@ int main(int argc, char **argv)
     ptero_step_cases();
     mount_cases();
     points_cases();
+    waves_cases();
     if (failures) {
         fprintf(stderr, "test_routines: %d differences\n", failures);
         return 1;

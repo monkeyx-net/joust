@@ -349,6 +349,38 @@ named; `game` checks each (section 3).
   +$1B, which counts down); while <$A1 is set, every $70
   looks (+B) one more brain may run at once (<$8F up, kept from wrapping,
   when <$90). No enemies left: the wave's end ($6BDC, not ported).
+- **The waves between them** (`sim/waves.c`): $6BC3 starts a game's
+  (wave 0, the record at $702F, two easy waves, 32 frames); $6BDC ends one
+  (no enemies left): <$3C down, the settings at $B1AD (a word and a
+  countdown each) stepped by $DE11's 14-byte records when their countdown
+  runs out (the next countdown a nibble by the CMOS difficulty, $CC14;
+  +$D the step, +6 the limit), <$9B down by 5 to $E0; then <$9F counted
+  down to the lava bridges burning ($6E01: two $8638 tasks after the one
+  before) or <$A0 to the flames (two $86D0 tasks after the list's first),
+  the egg counts, <$8F, <$A2 = $FF, <$B0 = 1, the message slots cleared,
+  the wave number (<$9E, `DAA`) up, the last wave's ending (+$13: the team
+  and survival bonuses, 3000 to each, and the gladiator wave's verdict,
+  with their messages), the messages erased; a frame later "WAVE n" and
+  the next record (+7: 4 bytes from $7173, round to $7173 after $7197:
+  the bounders and hunters, the shadow lords and <$8F, the pterodactyls,
+  the platforms and the kind). Platforms that change ($6EF0 with the
+  records at $6FCB, $6FD2, $6FD9, $6FE0: [bit][top bits][side bits]
+  [the burn's picture][a flag]): one burns away (its map bits cleared in
+  $AFE2-$B141 and $AE82-$AFE1 and <$4B, the sound $EF6A, a task $81A0 of
+  type $27), one comes back (its bits from the templates at $EB98 and
+  $E937, a frame's wait). The kind ($71BC): none, the first wave's
+  messages, team, gladiator, egg (12 eggs, $7417: six by rows from the
+  counts at $B187, six anywhere free in $B142's 69 slots, each a task
+  $769F at rest with +$2D from $B1BA, halved for two players, all but
+  the first two less a random part; a frame between them), pterodactyl
+  (a task $7200 making one every $41 frames, the last itself). Then the
+  messages (slots +$23-+$33: [message][colour][screen address], small
+  font, shown again one a frame by $6E73) for 30 frames and while tasks
+  follow this one ($6E53), erased; the enemies ($6E17: a task $8B0E of
+  type $F every $3D frames, <$A1 and <$AA up); the pterodactyl's wait
+  ($6DFE by +$1C, two easy waves; <$AD from $6DE2) and the manager. The
+  ROM keeps return addresses across sleeps in +$F and +$11 (A and B in
+  +$15); the C uses the same fields, and a stack within a step.
 - **The spawn** (`sim/spawn.c`, $87B0-$883D, $8B2D-$8D22): four pads, the
   records at $8A5D-$8A75 (8 bytes: [a word holding the pad's node
   template's address][x][line][its use count, <$6E-<$71]). $87B0: the use
@@ -542,7 +574,10 @@ named; `game` checks each (section 3).
   progress: about 2100 aiming at a player, 5000 swooping, 350 leaving)
   and its task step by step (1000 random flights and deaths, each step
   run to the ROM's sleep at $E15F: about 90000 steps, 1000 drawing its
-  body); $83D8 takes the pterodactyl's table too (60 killed); a
+  body); the wave task from a wave's end to the next wave's manager
+  (400 cases on every record and ending, the settings' countdowns and
+  the CMOS difficulty at random: about 100000 steps, 230 platform
+  changes, 1000 eggs); $83D8 takes the pterodactyl's table too (60 killed); a
   riderless mount's brain (20000 near its knight or not: about 700 pick
   it up, 5600 hop); $77BE, points placed among two displays near them
   (20000: about 9900 wait).

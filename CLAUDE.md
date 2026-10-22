@@ -108,7 +108,9 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   target), `platform.c` (landing on a platform, bouncing off one, $D9A3),
   `ptero.c` (the pterodactyl: start, brain, flight, death; $8209's pixels
   are `display_pixels`), `points.c` (points shown where they were won),
-  `text.c` (the ROM's text printer, $4A50); each mirrors a ROM routine's arithmetic exactly
+  `text.c` (the ROM's text printer, $4A50), `waves.c` (between waves:
+  the settings, messages, platforms, enemies and eggs; return addresses
+  kept in task fields across sleeps, as the ROM does); each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
 - `web/` - page shell for the Emscripten build
@@ -165,8 +167,8 @@ Every change keeps `ctest` green.
   (unhorsings, eggs, pterodactyls), the display list's nodes, $80D6,
   scoring, $D9A3, the pterodactyl's and a riderless mount's brains and
   points placed ($77BE) (on a game in progress) on
-  20000 random cases each, and the pterodactyl's task step by step (each
-  step run to its sleep, $E15F); RAM and the CMOS.
+  20000 random cases each, and the pterodactyl's and the wave task step by
+  step (each step run to its sleep, $E15F); RAM and the CMOS.
   Keep the random cases possible in the game (e.g. only players collect
   eggs): an impossible state sends the ROM through garbage. Each call
   starts with DP $A0 and the ROM selected. `ONLY=n` traces one pair case. Use it where scripted play rarely reaches a path; aim cases at the

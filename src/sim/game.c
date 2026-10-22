@@ -17,6 +17,7 @@
 #include "sim/ptero.h"
 #include "sim/spawn.h"
 #include "sim/wave.h"
+#include "sim/waves.h"
 #include "sim/tasks.h"
 
 #define RNG 0xA00D          /* <$0D-<$0E */
@@ -119,11 +120,12 @@ uint8_t game_daa(uint8_t a, int *c, int h)
     return (uint8_t)t;
 }
 
-/* $40F2: a byte from two CMOS nibbles at x */
-static uint8_t cmos_byte(const Game *g, uint16_t x)
+uint8_t game_cmos_byte(const Game *g, uint16_t x)
 {
     return (uint8_t)((game_read(g, x) << 4) + (game_read(g, (uint16_t)(x + 1)) & 0x0F));
 }
+
+static uint8_t cmos_byte(const Game *g, uint16_t x) { return game_cmos_byte(g, x); }
 
 /* $40FA: a byte to two nibbles */
 static void cmos_put(Game *g, uint16_t x, uint8_t v)
@@ -179,7 +181,7 @@ void game_sound(Game *g, uint16_t script)
 int game_step_ported(const Game *g, uint16_t task)
 {
     uint16_t at = game_word(g, (uint16_t)(task + TASK_RESUME));
-    return checksum_ported(at) || lava_ported(at) || collide_ported(at) || scores_ported(at) || flow_ported(at) || rider_ported(at) || wave_ported(at) || eggs_ported(at) || spawn_ported(at) || ptero_ported(at) || points_ported(at) || death_ported(at);
+    return checksum_ported(at) || lava_ported(at) || collide_ported(at) || scores_ported(at) || flow_ported(at) || rider_ported(at) || wave_ported(at) || eggs_ported(at) || spawn_ported(at) || ptero_ported(at) || points_ported(at) || death_ported(at) || waves_ported(at);
 }
 
 StepResult game_step(Game *g, uint16_t task)
@@ -197,5 +199,6 @@ StepResult game_step(Game *g, uint16_t task)
     if (ptero_ported(at)) return ptero_step(g, task, at);
     if (points_ported(at)) return points_step(g, task, at);
     if (death_ported(at)) return death_step(g, task, at);
+    if (waves_ported(at)) return waves_step(g, task, at);
     return STEP_UNPORTED;
 }

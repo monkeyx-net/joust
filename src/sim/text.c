@@ -31,3 +31,15 @@ uint16_t text_message_small(Game *g, uint8_t msg, uint8_t colour, uint16_t x)
 {
     return message(g, FONT_SMALL, msg, colour, x);
 }
+
+uint16_t text_number_small(Game *g, uint8_t bcd, uint8_t colour, uint16_t x)
+{
+    game_set_word(g, 0xA0D1, FONT_SMALL);
+    game_poke(g, 0xA0D0, bcd); /* $4B09 */
+    uint8_t a = (uint8_t)(bcd >> 4);
+    if (a > 0x0A) a = 0x0A;
+    x = character(g, game_word(g, 0xA0D1), a, colour, x);
+    a = game_peek(g, 0xA0D0) & 0x0F;
+    if (a > 0x0A) a = 0x0A;
+    return character(g, game_word(g, 0xA0D1), a, colour, x);
+}

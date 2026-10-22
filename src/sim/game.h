@@ -71,6 +71,9 @@ uint8_t game_daa(uint8_t a, int *c, int h);
    $CCFC + 6n) plus 1. */
 void game_audit(Game *g, uint8_t n);
 
+/* $40E1 (through $3B31): a byte from the two CMOS nibbles at x */
+uint8_t game_cmos_byte(const Game *g, uint16_t x);
+
 /* $6BA6: both players' controls through the multiplexer: A player 1's
    and the start buttons (& $37), B player 2's (& $07). */
 uint16_t game_controls(Game *g);

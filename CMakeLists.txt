@@ -63,6 +63,7 @@ add_library(joust_core STATIC
   src/sim/ptero.c
   src/sim/points.c
   src/sim/text.c
+  src/sim/waves.c
   src/emu/m6809.c
   src/emu/pia6821.c
   src/emu/board.c

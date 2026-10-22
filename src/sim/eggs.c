@@ -9,6 +9,7 @@
 #define FLYING 0x7611
 #define FALLING 0x7619
 #define RESTING 0x76A7
+#define LAID 0x769F     /* the egg wave's: at rest */
 #define GROWING 0x7757  /* hatching: the knight's frames from $7924 */
 #define HATCHED 0x7779
 #define STANDING 0x7792 /* the knight waiting for its mount */
@@ -18,7 +19,7 @@
 
 int eggs_ported(uint16_t at)
 {
-    return at == FLYING || at == FALLING || at == RESTING || at == GROWING || at == HATCHED || at == STANDING ||
+    return at == FLYING || at == FALLING || at == RESTING || at == LAID || at == GROWING || at == HATCHED || at == STANDING ||
            at == TAKEN;
 }
 
@@ -260,6 +261,7 @@ StepResult eggs_step(Game *g, uint16_t u, uint16_t at)
         draw(g, u);
         return task_sleep(g, game_peek(g, 0xA0B0), FALLING);
     case FALLING: return fall(g, u);
+    case LAID: return rest(g, u);
     case RESTING:
         if (!ground(g, u, 1)) {
             draw(g, u);

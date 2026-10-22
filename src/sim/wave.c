@@ -1,6 +1,7 @@
 #include "sim/wave.h"
 
 #include "sim/tasks.h"
+#include "sim/waves.h"
 
 #define MANAGER 0x6D91
 
@@ -16,7 +17,7 @@ static uint8_t dec(Game *g, uint16_t a)
 StepResult wave_step(Game *g, uint16_t u, uint16_t at)
 {
     (void)at;
-    if (!game_peek(g, 0xA0AA)) return STEP_UNPORTED; /* $6BDC: the wave's end */
+    if (!game_peek(g, 0xA0AA)) return waves_step(g, u, WAVES_END);
     if (!game_peek(g, 0xA0AC) || !dec(g, 0xA0AC)) {
         uint16_t d = (uint16_t)(game_word(g, 0xA0AD) - 1);
         if ((int16_t)d > 0) {

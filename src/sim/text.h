@@ -19,4 +19,8 @@ uint16_t text_message(Game *g, uint8_t msg, uint8_t colour, uint16_t x);
 /* $4ABF (through $4A53): the same in the small font */
 uint16_t text_message_small(Game *g, uint8_t msg, uint8_t colour, uint16_t x);
 
+/* $4AF7 (through $4A56): a BCD byte as two digits in the small font (a
+   digit above 9 is character $0A, a blank) */
+uint16_t text_number_small(Game *g, uint8_t bcd, uint8_t colour, uint16_t x);
+
 #endif
