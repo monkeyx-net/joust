@@ -1,7 +1,9 @@
 #include "sim/flow.h"
 
 #include "sim/spawn.h"
+#include "sim/start.h"
 #include "sim/tasks.h"
+#include "sim/text.h"
 
 #define TURN_TAKE 0x8B0E
 #define TURN_WAIT 0x8B1A
@@ -33,6 +35,29 @@ static StepResult code_wait(Game *g, uint16_t u, uint16_t want, uint16_t then)
     return task_sleep(g, 1, CODE_LOOK);
 }
 
+/* $6B4C: the code is right: a message (the bytes at $73AB, ^ $9B - $35:
+   characters, 0 a new line 16 lines down, negative the end), then the
+   busy loop at $6B79 (Game.halt) */
+static StepResult secret(Game *g)
+{
+    start_clear_screen(g);
+    g->palette[0] = 0x00; /* (STD $C000) */
+    g->palette[1] = 0xFF;
+    uint16_t u = 0x73AB, line = 0x1030, x = line;
+    for (;;) {
+        uint8_t a = (uint8_t)((uint8_t)(game_read(g, u++) ^ 0x9B) - 0x35);
+        if (a & 0x80) break;
+        if (!a) {
+            line = (uint16_t)(line + 0x10);
+            x = line;
+            continue;
+        }
+        x = text_char_small(g, a, 0x11, x);
+    }
+    g->halt = 0x6B79;
+    return STEP_HALT;
+}
+
 /* $6B9B: the controls against +D, on to the continuation at +F */
 static StepResult code_look(Game *g, uint16_t u)
 {
@@ -43,7 +68,7 @@ static StepResult code_look(Game *g, uint16_t u)
     case 0x6B2E: return same ? code_wait(g, u, want, 0x6B2E) : task_sleep(g, 15, CODE_2);
     case 0x6B3A: return same ? code_wait(g, u, want, 0x6B3E) : task_sleep(g, 30, CODE_1);
     case 0x6B3E: return same ? code_wait(g, u, want, 0x6B3E) : task_sleep(g, 15, CODE_3);
-    case 0x6B4A: return same ? STEP_UNPORTED /* $6B4C: the message */ : code_wait(g, u, want, 0x6B2E);
+    case 0x6B4A: return same ? secret(g) : code_wait(g, u, want, 0x6B2E);
     }
     return STEP_UNPORTED;
 }

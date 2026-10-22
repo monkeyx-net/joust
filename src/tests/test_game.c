@@ -82,6 +82,9 @@ static void read_hook(void *user, uint16_t addr)
 static int predicted_mux;
 static uint8_t predicted_cmos[1024];
 static int step_active, step_interrupted;
+static Game halted;
+static int halt_pending;
+static long halts;
 static long steps, steps_unported, steps_matched, steps_reordered, steps_raced, frame_checks;
 static struct { uint16_t at; long n, ported, matched; } by_resume[128];
 
@@ -135,7 +138,7 @@ static void apply_irq_writes(Game *m)
 static int merged_matches(void)
 {
     other = reads;
-    if (game_step(&other, step_task) == STEP_UNPORTED) return 0;
+    if (game_step(&other, step_task) != STEP_DONE) return 0;
     merged = before;
     apply_irq_writes(&merged);
     for (unsigned a = 0; a < GAME_RAM; a++) {
@@ -182,7 +185,7 @@ static int matches_interleaved(void)
             game_poke(&other, irq_writes[i].addr, irq_writes[i].value);
         next_irq++;
     }
-    return r != STEP_UNPORTED && first_difference_of(&other) == -1;
+    return r == STEP_DONE && first_difference_of(&other) == -1;
 }
 
 static int matches_reordered(void)
@@ -240,7 +243,11 @@ static void start_step(uint16_t task)
     scratch.on_read = read_hook;
     StepResult r = game_step(&scratch, task);
     scratch.on_read = NULL;
-    if (r == STEP_UNPORTED) { /* a path not ported: the ROM's writes are copied */
+    if (r == STEP_HALT) { /* into a busy loop: checked when the ROM gets there */
+        halted = scratch;
+        halt_pending = 1;
+    }
+    if (r != STEP_DONE) { /* a path not ported (or one leaving the kernel): the ROM's writes are copied */
         steps_unported++;
         return;
     }
@@ -300,6 +307,21 @@ static void step_hook(Board *b)
     /* the board calls the hook also before an instruction the CPU then
        puts off for an interrupt; it comes again when the instruction runs */
     if ((b->cpu.irq && !(b->cpu.cc & CC_I)) || (b->cpu.firq && !(b->cpu.cc & CC_F))) return;
+    if (halt_pending && b->cpu.pc == halted.halt) { /* the C step's busy loop: the same RAM as the ROM's there */
+        halt_pending = 0;
+        halts++;
+        /* (the interrupt's blits land during the ROM's clearing of the screen,
+           in an order the C step does not have: only the C step's own
+           drawing, the message's pixels, is compared) */
+        int shown = 0;
+        for (unsigned a = 0; a < 0x9800; a++)
+            if (halted.ram[a] && halted.ram[a] != b->ram[a]) {
+                if (!shown++) failures++;
+                if (shown <= (getenv("DBG") ? 40 : 1))
+                    fprintf(stderr, "test_game: frame %lld: at the busy loop $%04X: $%04X = %02X, C %02X\n",
+                            (long long)b->frame, halted.halt, a, b->ram[a], halted.ram[a]);
+            }
+    }
     if (b->cpu.last_interrupt && irq_depth < 8) {
         /* the stacked CC's E bit: the whole state (12 bytes) or PC and CC (3) */
         irq_s[irq_depth++] = (uint16_t)(b->cpu.s + (b->ram[b->cpu.s] & 0x80 ? 12 : 3));
@@ -436,6 +458,7 @@ int main(int argc, char **argv)
            "           reordered, %ld took paths not yet ported; %ld frames compared\n",
            steps, steps_matched, steps_reordered, steps_unported, frame_checks);
     printf("test_game: races (an interrupt inside a step, state read partly before it): %ld\n", steps_raced);
+    if (halts) printf("test_game: busy loops reached as the C step left them: %ld\n", halts);
     if (steps_raced * 1000 > steps) {
         fprintf(stderr, "test_game: too many races\n");
         failures++;

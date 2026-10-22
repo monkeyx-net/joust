@@ -85,7 +85,9 @@ static int run(Game *g, const FrameHooks *h, uint16_t prev, uint16_t t, uint16_t
     set_word(g, TASK_PREVIOUS, prev);
     set_word(g, TASK_CURRENT, t);
     if (h && h->interrupts) h->interrupts(h->ctx, g, t);
-    if (game_step(g, t) == STEP_UNPORTED) {
+    StepResult r = game_step(g, t);
+    if (r == STEP_HALT) return 2;
+    if (r == STEP_UNPORTED) {
         if (unported) *unported = t;
         return 1;
     }
@@ -123,7 +125,8 @@ FrameResult frame_run(Game *g, const FrameHooks *h, uint16_t *unported)
             prev = t;
             continue;
         }
-        if (run(g, h, prev, t, unported)) return FRAME_UNPORTED;
+        int r = run(g, h, prev, t, unported);
+        if (r) return r == 2 ? FRAME_HALT : FRAME_UNPORTED;
         prev = after(g, prev, t);
     }
     /* the second */
@@ -147,7 +150,8 @@ FrameResult frame_run(Game *g, const FrameHooks *h, uint16_t *unported)
             prev = t;
             continue;
         }
-        if (run(g, h, prev, t, unported)) return FRAME_UNPORTED;
+        int r = run(g, h, prev, t, unported);
+        if (r) return r == 2 ? FRAME_HALT : FRAME_UNPORTED;
         prev = after(g, prev, t);
     }
     set_word(g, TASK_PASS2, prev);

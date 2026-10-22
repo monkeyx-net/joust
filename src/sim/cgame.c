@@ -36,6 +36,15 @@ void cgame_start(CGame *c)
 
 FrameResult cgame_frame(CGame *c, uint16_t *task)
 {
+    if (c->g->halt == 0x6B79) { /* the secret message: shown while the code's controls are held */
+        if (c->picture) c->picture(c->user, c->g);
+        if (game_controls(c->g) == 0x0506) c->halt_count = 26;
+        else if (--c->halt_count <= 0) { /* ($1BE6 looks, then JMP [$FFFE]: the reset) */
+            c->g->halt = 0;
+            cgame_start(c);
+        }
+        return FRAME_DONE;
+    }
     if (c->operating) {
         operator_frame(&c->op, c->g);
         if (c->picture) c->picture(c->user, c->g);
@@ -48,6 +57,10 @@ FrameResult cgame_frame(CGame *c, uint16_t *task)
     FrameHooks h = { c, interrupts, NULL };
     c->g->beam = NULL;
     FrameResult r = frame_run(c->g, &h, task);
+    if (r == FRAME_HALT) {
+        c->halt_count = 26;
+        return FRAME_DONE;
+    }
     if (c->advance) { /* $F342 */
         c->advance = 0;
         operator_test_mode(&c->op);

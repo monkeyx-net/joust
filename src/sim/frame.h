@@ -35,6 +35,7 @@ typedef struct {
 typedef enum {
     FRAME_DONE = 0,
     FRAME_UNPORTED = 1, /* a task step not ported: the state is unspecified */
+    FRAME_HALT = 2,     /* a step left the kernel (Game.halt) */
 } FrameResult;
 
 /* One frame of the loop. *unported (if not NULL) gets the task whose step

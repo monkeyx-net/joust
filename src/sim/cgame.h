@@ -25,6 +25,7 @@ typedef struct {
     void *user;
     int advance;   /* the advance switch was pressed: the test mode next */
     int operating; /* the system program runs (sim/operator.c), not the game */
+    int halt_count; /* frames left in a busy loop (Game.halt) */
     Operator op;
 } CGame;
 

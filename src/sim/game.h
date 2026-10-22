@@ -44,6 +44,9 @@ typedef struct {
        (a test: the board's reads in turn), else vcount */
     uint8_t (*beam)(void *user);
     uint8_t vcount;
+    /* a busy loop a step went into (STEP_HALT): $6B79, the secret code's
+       message, until the controls let go and it resets the machine */
+    uint16_t halt;
     /* optional, for tests: called before each RAM write the C game makes,
        and on each RAM read */
     void (*on_write)(void *user, uint16_t addr);
@@ -54,6 +57,7 @@ typedef struct {
 typedef enum {
     STEP_UNPORTED = 0, /* the task (or the path it took) is not ported: the state is unspecified */
     STEP_DONE = 1,     /* it slept or ended */
+    STEP_HALT = 2,     /* it left the task kernel for a busy loop (Game.halt says which) */
 } StepResult;
 
 /* The whole state from a RAM image of $0000-$BFFF and the ROM select. */

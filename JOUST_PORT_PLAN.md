@@ -609,8 +609,12 @@ named; `game` checks each (section 3).
   right+flap), each held until it changes, the next looked for 15 frames
   later; a wrong one starts over after 30 frames. $6B90 keeps the wanted
   controls in +D and the continuation in +F, looking every frame at
-  $6B9B. At the end ($6B4C, not ported) a message, then `JMP [$FFFE]`:
-  the machine restarts. `game_runner` enters it at frame 5000.
+  $6B9B. At the end ($6B4C) the screen cleared, a message decoded from
+  $73AB (^ $9B - $35), then a busy loop ($6B79) while the controls stay,
+  and `JMP [$FFFE]`: the machine restarts. In C the step returns
+  STEP_HALT (`Game.halt`), the C game runs the loop a frame at a time and
+  restarts with the self-test; `game_runner` enters the code at frame
+  5000 and checks the message's pixels where the ROM reaches $6B79.
 - **The enemies' brains** ($7A83-$80D5, `sim/brains.c`): state machines,
   the state's address at +$24; each state sets <$32-<$33 and usually the
   next state, and returns. Three families ($7A83 on, $7C95 on, $7ECF on),
