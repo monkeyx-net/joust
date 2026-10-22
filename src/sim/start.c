@@ -1,5 +1,6 @@
 #include "sim/start.h"
 
+#include "sim/attract.h"
 #include "sim/score.h"
 #include "sim/spawn.h"
 #include "sim/tasks.h"
@@ -28,13 +29,13 @@ int start_ported(uint16_t at)
 }
 
 /* $40BC (through $3B2E): video RAM ($0000-$9FFF) cleared, from the top down */
-static void clear_screen(Game *g)
+void start_clear_screen(Game *g)
 {
     for (uint16_t a = 0xA000; a-- > 0;) poke(g, a, 0);
 }
 
 /* $E4B2 (through $E015): the palette's copy <$0F-<$1E from x */
-static void palette(Game *g, uint16_t x)
+void start_palette(Game *g, uint16_t x)
 {
     for (int i = 0; i < 16; i++) poke(g, (uint16_t)(0xA00F + i), rom(g, (uint16_t)(x + i)));
 }
@@ -45,10 +46,9 @@ static void picture(Game *g, uint8_t ctrl, uint8_t solid, uint16_t x, uint16_t d
     game_blit(g, ctrl, solid, (uint16_t)(x + 2), d, (uint8_t)(rom(g, x) ^ 4), (uint8_t)(rom(g, (uint16_t)(x + 1)) ^ 4));
 }
 
-/* $6336: the credits (<$F2) at the bottom */
-static void credits(Game *g)
+void start_credits(Game *g, uint8_t ctrl, uint8_t solid)
 {
-    picture(g, 0x12, 0x00, 0x6357, 0x37E2);
+    picture(g, ctrl, solid, 0x6357, 0x37E2);
     uint16_t x = text_message_small(g, 0x50, 0x22, 0x38E3);
     uint8_t a = peek(g, 0xA0F2);
     if (!(a & 0xF0)) a |= 0xF0;
@@ -230,6 +230,11 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
     for (int guard = 0; guard < 256; guard++) {
         switch (at) {
         /* ---- the demo ($5EF8) ------------------------------------------------ */
+        case START_DEMO: /* $5EEB, after the title page */
+            poke(g, 0xA090, 0x7F);
+            poke(g, 0xA077, 3);
+            poke(g, 0xA060, 3);
+            return task_sleep(g, 4, 0x63E5);
         case 0x5EF8:
             poke(g, 0xA08E, 0);
             poke(g, 0xA08F, 0);
@@ -246,7 +251,7 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
             poke(g, 0xA06E, 0xFF);
             poke(g, 0xA06F, 0xFF);
             poke(g, 0xA070, 0xFF);
-            credits(g);
+            start_credits(g, 0x12, 0x00);
             set_word(g, F(u, 0x2B), 0x5FC5);
             /* fall through */
         case 0x5F3B: /* the next page */
@@ -306,7 +311,7 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
             return task_sleep(g, 8, 0x61FB);
         case 0x61FB:
             task_create(g, u, 0x6359, 0x48, 0x00);
-            credits(g);
+            start_credits(g, 0x12, 0x00);
             poke(g, 0xA08F, 0);
             for (x = word(g, word(g, TASK_HEAD)); (x = word(g, x)) != 0;) { /* the enemies to their first brains */
                 a = peek(g, F(x, 2));
@@ -337,10 +342,10 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
             task_kill_type(g, 0, 0);
             /* fall through */
         case 0x6271:
-            palette(g, 0x62F1);
+            start_palette(g, 0x62F1);
             return task_sleep(g, 4, 0x627C);
         case 0x627C:
-            clear_screen(g);
+            start_clear_screen(g);
             /* fall through */
         case 0x627F:
             poke(g, 0xA090, 0);
@@ -352,7 +357,7 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
             }
             set_word(g, F(u, 0xD), 0x0384);
             poke(g, F(u, 0x10), 0);
-            palette(g, 0x62E9);
+            start_palette(g, 0x62E9);
             return STEP_UNPORTED; /* $3B43: the high score table (the system ROM) */
         case 0x62AD:
             poke(g, 0xA011, (uint8_t)(peek(g, 0xA011) + 1));
@@ -370,7 +375,7 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
             poke(g, F(u, 0x10), (uint8_t)(b - 1));
             if ((int8_t)b > 1) return task_sleep(g, 1, 0x62AD);
             task_create(g, u, 0x62DA, 0x49, 0x00);
-            return STEP_UNPORTED; /* $D000: the attract pages */
+            return attract_step(g, u, ATTRACT_PAGES);
         case 0x62DA: return task_sleep(g, 5, 0x62DF);
         case 0x62DF:
             if (game_controls(g) != 0x0201) return task_sleep(g, 5, 0x62DF);
@@ -381,9 +386,9 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
         case 0x6301: return task_sleep(g, 4, 0x6306);
         case 0x6306:
             poke(g, F(u, 0xD), 0x1E);
-            clear_screen(g);
-            palette(g, rom_word(g, 0xE033));
-            credits(g);
+            start_clear_screen(g);
+            start_palette(g, rom_word(g, 0xE033));
+            start_credits(g, 0x12, 0x00);
             block(g, (uint8_t)(peek(g, 0xA0F2) == 1 ? 0x19 : 0x1A), 0, 0);
             return task_sleep(g, 0x3C, 0x6327);
         case 0x6327:
@@ -445,8 +450,8 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
 
         /* ---- a game's set-up ($63E5) ----------------------------------------- */
         case 0x63E5: {
-            clear_screen(g);
-            palette(g, rom_word(g, 0xE033));
+            start_clear_screen(g);
+            start_palette(g, rom_word(g, 0xE033));
             uint16_t s = 0x719B;
             x = rom_word(g, s);
             uint16_t d = rom_word(g, (uint16_t)(s + 2));

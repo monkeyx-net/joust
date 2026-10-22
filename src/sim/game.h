@@ -31,6 +31,7 @@ typedef struct {
     /* the CPU's Y as a task step starts: what the step before left; one
        step reads it ($81C4, a platform's burn), the tests copy the board's */
     uint16_t y;
+    uint8_t b; /* the same for B ($D15B, the attract mode's border lights) */
     /* optional, for tests: called before each RAM write the C game makes,
        and on each RAM read */
     void (*on_write)(void *user, uint16_t addr);

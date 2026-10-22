@@ -34,7 +34,17 @@
 
 #include "sim/game.h"
 
+#define START_DEMO 0x5EEB
+
 int start_ported(uint16_t at);
 StepResult start_step(Game *g, uint16_t task, uint16_t at);
+
+/* $40BC (through $3B2E): video RAM ($0000-$9FFF) cleared from the top down */
+void start_clear_screen(Game *g);
+/* $E4B2 (through $E015): the palette's copy <$0F-<$1E from x */
+void start_palette(Game *g, uint16_t x);
+/* $6336 / $633A: the credits (<$F2) at the bottom, their box blitted
+   with ctrl and solid ($12 $00, or as the caller's Y says) */
+void start_credits(Game *g, uint8_t ctrl, uint8_t solid);
 
 #endif

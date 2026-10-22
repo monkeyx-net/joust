@@ -228,6 +228,7 @@ static void start_step(uint16_t task)
     model.inp1 = board.inp1;
     model.inp2 = board.inp2;
     model.y = board.cpu.y;
+    model.b = board.cpu.b;
     before = model;
     irq_count = irq_n = 0;
     step_writes = 0;

@@ -112,7 +112,7 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   kept in task fields across sleeps, as the ROM does), `burn.c` (platforms
   burning away, the lava bridges and flames), `cycle.c` (the colour cycle),
   `start.c` (the shell: start buttons, a game's set-up, game over, the
-  demo); each mirrors a ROM routine's arithmetic exactly
+  demo), `attract.c` (the title page: logo, border lights); each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
 - `web/` - page shell for the Emscripten build
@@ -171,7 +171,7 @@ Every change keeps `ctest` green.
   points placed ($77BE) (on a game in progress) on
   20000 random cases each, and the pterodactyl's, the wave task and the
   burning tasks step by step (each step run to its sleep, $E15F; the CPU's
-  Y at random, `Game.y`); RAM and the CMOS.
+  Y at random, `Game.y`; `Game.b` likewise for B); RAM and the CMOS.
   Keep the random cases possible in the game (e.g. only players collect
   eggs): an impossible state sends the ROM through garbage. Each call
   starts with DP $A0 and the ROM selected. `ONLY=n` traces one pair case. Use it where scripted play rarely reaches a path; aim cases at the

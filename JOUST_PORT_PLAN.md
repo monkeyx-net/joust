@@ -504,8 +504,15 @@ named; `game` checks each (section 3).
   countdown held by player 1 right with player 2 left) and the demo
   ($5EF8: pages from $5FCA, text blocks from [$5D7B + 2n] shown every 2
   frames, demo riders, $60A3, and the demo players' brains $6021-$61EF in
-  `sim/brains.c`). Not ported: the system ROM's pages it goes to ($3B43
-  the high score table, $3B61 the entry, $D000 the attract pages).
+  `sim/brains.c`). The attract title page (`sim/attract.c`, $D000-$D35C):
+  the operator's two lines from the CMOS ($44D4), the credits, the
+  extra-life interval, the logo as polylines from $D35D drawn pixel by
+  pixel ($D2A8, scratch $BC00-$BC1F, some filled down, $D254), lights
+  round the border ($D15B: the loop's place in +$13 as the ROM keeps its
+  return address; +$12 takes the CPU's B as the task first runs, which
+  the C model keeps as `Game.b`, as it keeps Y for $81C4) and a palette
+  sweep ($D0ED); then the demo. Not ported: the system ROM's pages ($3B43
+  the high score table, $3B61 the entry, $3BCD).
 - **A secret code** ($6B20-$6BA5, in `sim/flow.c`): during a game a task
   watches both players' controls ($6BA6) for $2502, then $1204, then
   $0506 (player 1 left+flap with start 1 and player 2 right; start 2 with
