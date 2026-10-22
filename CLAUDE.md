@@ -49,6 +49,7 @@ ctest --test-dir build -L rom                     # tests needing the ROM set (r
 ctest --test-dir build -L mame                    # tests needing MAME + the ROM set
 build/joust --windowed                            # play (finds roms/joust.zip in dev builds)
 build/joust --windowed --test-card                # the test card and image pages
+build/joust --windowed --c-game                   # the game in C (sim/), the board only for sound
 build/joust --windowed --gfx hd-glow              # enhanced graphics (presets: classic ... hd-glow-crt)
 SDL_VIDEODRIVER=dummy build/joust --frames 60 --screenshot out.png   # headless screenshot
 build/joust --check-rom roms/joust.zip            # verify a ROM set
@@ -64,7 +65,9 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
 
 ## Layout (`src/`)
 
-- `main.c` - SDL setup, fixed 60 Hz loop running one board frame per tick,
+- `main.c` - SDL setup, fixed 60 Hz loop running one board frame per tick
+  (or with `--c-game` one frame of the C game, sim/cgame.c, taken over from
+  the board at its frame loop's first start, the board then only sounding),
   the graphics pipeline, CMOS saving, the controls page over the attract
   mode (after 30 s idle; `$A09F` = 2 tells a game from the attract mode),
   the test card (`--test-card`),
@@ -116,7 +119,8 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   (the system ROM's high score table and entry), `troll.c` (the lava
   troll's hand), `irq.c` (the interrupt: palette, switches, coins, the
   display list's blits), `frame.c` (the frame loop: both passes, the
-  sound queue, the layers; hooks for the interrupts' timing); each mirrors a ROM routine's arithmetic exactly
+  sound queue, the layers; hooks for the interrupts' timing), `cgame.c`
+  (the C game alone: the interrupt on a fixed schedule); each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
 - `web/` - page shell for the Emscripten build

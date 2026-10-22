@@ -6,7 +6,7 @@
  * (ROM status, a two-player input tester, the graphics presets, and pages of
  * the images decoded from the ROM: Select+R1 / F2 steps the pages).
  *
- *   joust [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N]
+ *   joust [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N] [--c-game]
  *         [--input script.txt] [--frames N] [--screenshot out.png]
  *   joust --check-rom <dir|zip>
  *   joust --dump-rom <dir|zip> <first> <last>
@@ -32,6 +32,7 @@
 #include "assets/rom.h"
 #include "assets/savefile.h"
 #include "emu/board.h"
+#include "gfx/williams.h"
 #include "gfx/blit.h"
 #include "gfx/debugfont.h"
 #include "gfx/enhance.h"
@@ -39,6 +40,8 @@
 #include "platform/audio.h"
 #include "platform/input.h"
 #include "platform/video.h"
+#include "sim/cgame.h"
+#include "sim/game.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -88,9 +91,19 @@ typedef struct {
     Board board;
     int cmos_wait;       /* frames until changed CMOS is written */
     long idle;           /* frames of attract mode without input (the controls page) */
-} Game;
+    /* --c-game: the game in C (sim/), the board only for its sound */
+    int c_game;
+    int c_ready;         /* loaded from the board at its frame loop's start */
+    int c_stopped;       /* a step not ported: the C game stops */
+    Game cg;
+    CGame cgd;
+    uint8_t rom_flat[0x10000];
+    uint8_t cmos_saved[BOARD_CMOS_SIZE];
+    int64_t c_frame;     /* frames since the switch (the sound board's clock) */
+    int64_t c_base;      /* the board's frame at the switch */
+} App;
 
-static Game g;
+static App g;
 
 /* ---- test card ------------------------------------------------------------ */
 
@@ -210,6 +223,79 @@ static void draw_images(Framebuffer *t)
 
 /* ---- the game --------------------------------------------------------------- */
 
+/* ---- the game in C (--c-game) --------------------------------------------- */
+
+static void c_sound(void *user, uint8_t command)
+{
+    (void)user;
+    sound_command(&g.board.sound, (uint8_t)(command | 0xC0)); /* (as the board's PIA latches it) */
+}
+
+static void c_picture(void *user, const Game *cg)
+{
+    (void)user;
+    williams_draw_vram(&fb, cg->ram, cg->palette);
+}
+
+/* The C game takes the board's state at its frame loop's first start
+   ($E0E2), after the power-on; from then on the board runs only its sound. */
+static void c_load_hook(Board *b)
+{
+    if (g.c_ready || b->cpu.pc != 0xE0E2) return;
+    game_load(&g.cg, b->ram, b->romsel);
+    memcpy(g.cg.cmos, b->cmos, sizeof g.cg.cmos);
+    memcpy(g.cmos_saved, b->cmos, sizeof g.cmos_saved);
+    g.cg.pia0_crb = b->pia[0].b.cr;
+    g.cg.mux = b->mux_select;
+    for (int i = 0; i < 16; i++) g.cg.palette[i] = b->palette[i];
+    g.c_ready = 1;
+}
+
+static void c_start(void)
+{
+    for (unsigned a = 0; a < 0x10000; a++) {
+        int v = rom_byte(&g.rom, a);
+        g.rom_flat[a] = v < 0 ? 0 : (uint8_t)v;
+    }
+    g.cg.rom = g.rom_flat;
+    g.cg.on_sound = c_sound;
+    g.board.step_hook = c_load_hook;
+    while (!g.c_ready) board_run_frame(&g.board, NULL);
+    g.board.step_hook = NULL;
+    g.cgd.g = &g.cg;
+    g.cgd.picture = c_picture;
+    g.c_base = g.board.frame;
+}
+
+/* A frame of the C game, then a frame of the sound board's. */
+static void c_step(const InputFrame *in)
+{
+    Game *cg = &g.cg;
+    cg->inp1 = (uint8_t)((in->p[0].move_x < 0 ? INP_LEFT : 0) | (in->p[0].move_x > 0 ? INP_RIGHT : 0) |
+                         (in->p[0].flap ? INP_FLAP : 0));
+    cg->inp2 = (uint8_t)((in->p[1].move_x < 0 ? INP_LEFT : 0) | (in->p[1].move_x > 0 ? INP_RIGHT : 0) |
+                         (in->p[1].flap ? INP_FLAP : 0));
+    cg->in0 = (uint8_t)((in->start ? IN0_START1 : 0) | (in->start2 ? IN0_START2 : 0));
+    cg->in2 = (uint8_t)((in->coin ? IN2_COIN1 : 0) | (in->menu_held ? IN2_ADVANCE : 0));
+    g.board.sound.out_len = 0;
+    if (!g.c_stopped) {
+        uint16_t task = 0;
+        if (cgame_frame(&g.cgd, &task) != FRAME_DONE) {
+            fprintf(stderr, "joust: the C game reached a step not ported (task $%04X at $%04X); it stops here\n", task,
+                    game_word(cg, (uint16_t)(task + 5)));
+            g.c_stopped = 1;
+        }
+    }
+    g.c_frame++;
+    int64_t main_cycles = (g.c_base + g.c_frame) * (int64_t)(BOARD_LINES * BOARD_CYCLES_PER_LINE);
+    sound_run(&g.board.sound, (int64_t)((double)main_cycles * SOUND_CPU_HZ / 1e6));
+    if (memcmp(cg->cmos, g.cmos_saved, sizeof g.cmos_saved)) {
+        memcpy(g.board.cmos, cg->cmos, sizeof g.board.cmos);
+        g.board.cmos_dirty = 1;
+        memcpy(g.cmos_saved, cg->cmos, sizeof g.cmos_saved);
+    }
+}
+
 /* With blank CMOS the arcade restores its factory settings and then waits for
    a reset; run that headless once, as the MAME tests prime their CMOS. */
 static void board_start(void)
@@ -227,6 +313,7 @@ static void board_start(void)
 #ifdef __EMSCRIPTEN__
     for (int i = 0; i < BOOT_SKIP_FRAMES; i++) board_run_frame(&g.board, NULL);
 #endif
+    if (g.c_game) c_start();
 }
 
 static void save_cmos(void)
@@ -254,7 +341,7 @@ static void board_inputs(const InputFrame *in)
 /* The game's own state: $A09F is 2 from shortly after a game starts to its
    end, and never 2 in the attract mode, with or without credits (found
    with ram_probe.lua, 1 and 2 players). */
-static int game_running(void) { return g.board.ram[0xA09F] == 2; }
+static int game_running(void) { return (g.c_game ? g.cg.ram : g.board.ram)[0xA09F] == 2; }
 
 static bool any_input(const InputFrame *in)
 {
@@ -344,8 +431,12 @@ static void step(const InputFrame *in)
     g.clock++;
     g.in = *in;
     if (!g.test_card) {
-        board_inputs(in);
-        board_run_frame(&g.board, &fb);
+        if (g.c_game) {
+            c_step(in);
+        } else {
+            board_inputs(in);
+            board_run_frame(&g.board, &fb);
+        }
         g.idle = game_running() || any_input(in) ? 0 : g.idle + 1;
         audio_stream(g.board.sound.out, g.board.sound.out_len, BOARD_AUDIO_RATE);
         if (g.board.cmos_dirty && --g.cmos_wait <= 0) {
@@ -532,6 +623,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--rom") && i + 1 < argc) rom_arg = argv[++i];
         else if (!strcmp(argv[i], "--page") && i + 1 < argc) g.page = (int)strtol(argv[++i], NULL, 10);
         else if (!strcmp(argv[i], "--test-card")) g.test_card = 1;
+        else if (!strcmp(argv[i], "--c-game")) g.c_game = 1;
         else if (!strcmp(argv[i], "--input") && i + 1 < argc) {
             if (load_script(argv[++i])) return 2;
         }
@@ -542,7 +634,7 @@ int main(int argc, char **argv)
             }
         } else {
             fprintf(stderr,
-                    "usage: %s [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N]\n"
+                    "usage: %s [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N] [--c-game]\n"
                     "          [--input script.txt] [--frames N] [--screenshot out.png]\n"
                     "       %s --check-rom <dir|zip>\n"
                     "       %s --dump-rom <dir|zip> <first> <last>\n"

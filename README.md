@@ -6,7 +6,9 @@ web, checked against the original ROM running in MAME.
 
 **Status:** playable. The game is your ROM's own code on an emulated Williams
 board (6809 main board, 6808 sound board), written in C and checked against
-MAME cycle for cycle; the port adds enhanced graphics presets, pad controls,
+MAME cycle for cycle; the game itself is also rewritten in C, routine by
+routine (`--c-game`, checked step by step and frame by frame against the
+emulated board); the port adds enhanced graphics presets, pad controls,
 CMOS saving and packaging for handhelds, desktops and the web. See
 [JOUST_PORT_PLAN.md](JOUST_PORT_PLAN.md).
 
@@ -46,7 +48,7 @@ Pads use SDL's game controller database; set `JOUST_GAMECONTROLLERDB` to a
 
 ```bash
 build/joust [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N]
-            [--input script.txt] [--frames N] [--screenshot out.png]
+            [--c-game] [--input script.txt] [--frames N] [--screenshot out.png]
 build/joust --check-rom roms/joust.zip            # verify a ROM set
 build/joust --dump-rom roms/joust.zip D000 D0FF   # main-CPU ROM bytes, "ADDR BYTE" hex
 build/joust --list-images                         # the image catalogue, ADDR:W:H
@@ -56,6 +58,9 @@ build/joust --list-images                         # the image catalogue, ADDR:W:
   `hd-smooth`, `hd-glow`, `hd-glow-crt`.
 - `--test-card`: ROM status, an input tester, the presets, and pages of the
   images decoded from the ROM (`--page N`, or Select + R1 / F2 to step).
+- `--c-game`: the game rewritten in C (`src/sim/`) instead of the
+  emulated main CPU, from the end of the power-on (the emulated sound
+  board still plays the sounds; the operator's test mode is not there yet).
 - `--input`, `--frames`, `--screenshot`: scripted, headless runs
   (`SDL_VIDEODRIVER=dummy`); see the comment at the top of `src/main.c`.
 
@@ -153,6 +158,13 @@ ctest --test-dir build -L mame      # needs MAME 0.289 and the ROM set
 
 - `enhance` (always): scalers, presets, glow.
 - `rom_load` (`rom`): the loader, from the zip and from renamed files.
+- `game`, `game_runner`, `game_two` (`rom`): every task step of three
+  scripted games run in C against the emulated board's, byte for byte.
+- `routines` (`rom`): ROM routines and task steps on random inputs against
+  the C ones (collisions, scoring, brains, the waves, the high score entry,
+  the troll and more).
+- `frame`, `frame_two` (`rom`): the C game alone, frame by frame against
+  the board, given the board's interrupt timing.
 - `mame_rom_map`, `mame_capture`, `mame_images`, `mame_prng`, `mame_emu`
   (`mame`): the port against MAME: the ROM map, video and palette decoding,
   the blitter on every catalogued image, the random number generator, and

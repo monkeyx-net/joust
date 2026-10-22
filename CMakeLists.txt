@@ -72,6 +72,7 @@ add_library(joust_core STATIC
   src/sim/troll.c
   src/sim/irq.c
   src/sim/frame.c
+  src/sim/cgame.c
   src/emu/m6809.c
   src/emu/pia6821.c
   src/emu/board.c
