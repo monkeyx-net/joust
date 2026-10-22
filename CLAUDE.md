@@ -102,7 +102,7 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   $8F04/$8F3D, landing, on the ground, $8D4D, taking off and falling off;
   the players' brains and $EEC2's), `wave.c` (the wave manager's frequent path, $6D91), `eggs.c` (eggs in
   flight and at rest; hatching not yet), `spawn.c` (a rider appearing on a
-  pad and waiting on it), `score.c` (scores, extra lives, CMOS audits;
+  pad and waiting on it), `death.c` (a player's death, $8279), `score.c` (scores, extra lives, CMOS audits;
   the model keeps the CMOS and a faithful `DAA`), `brains.c` (the enemies' brains,
   $7A83-$80D5: state machines as basic blocks by ROM address; $80D6 the
   target), `platform.c` (landing on a platform, bouncing off one, $D9A3);

@@ -73,7 +73,7 @@ static void poke_word(uint16_t a, uint16_t v)
 }
 
 /* where the outcome's unported paths begin */
-static const uint16_t outcome_stops[] = { 0x8279, 0x8428 };
+static const uint16_t outcome_stops[] = { 0x8428 };
 static uint8_t base[0xC000];      /* RAM of a game in progress (the scripted game's frame 2000) */
 static uint16_t base_player;     /* the player's task block in it */
 static int stop_at_outcomes;

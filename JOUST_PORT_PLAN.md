@@ -224,7 +224,17 @@ named; `game` checks each (section 3).
   down; a task $7611 of type $82 after it: 8 lines up, 4 right, its
   velocity and speed, its table one rank up below $89E3 (+$31), +$33 from
   its own less 1, and at 0 the winner catches it at once). A player's
-  death ($8279) is not ported. $753B (also $7535, types without bit 0 in
+  death ($8279 player 1, $827F player 2, `sim/death.c`): the egg count
+  (<$36/<$37) cleared, the deaths (<$A5/<$A6) counted, <$AC = $25; killed
+  by the other player, the gladiator bounty when that player's count
+  ([table+$18]: <$A3/<$A4) comes up to 0: 3000 points, a task showing
+  them ($7861) and the sound $EF80 (an enemy's kill with <$90 and <$A0
+  set <$B0 = 2); then the death's task ($8139, type $20), 50 points, the
+  ROM check $85C1 (a sum of $22 bytes from [$8636] must be $32, else the
+  free list is corrupted), the sound $EFB7, the player out of <$73-<$76,
+  a life gone (+6); the last with <$90 set: the other player on ($834B,
+  type 9) if <$52 | <$5C, else game over ($61F0, type $34, after the
+  list's first task). $753B (also $7535, types without bit 0 in
   common): an egg collected (the sound $EF86, the collector's egg count,
   [+D]+$12, up to 4; points by it from $75A1: 250, 500, 750, 1000, plus
   500 caught in the air; one enemy fewer, <$AA; its waiting mount sent

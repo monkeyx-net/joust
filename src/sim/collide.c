@@ -1,5 +1,6 @@
 #include "sim/collide.h"
 
+#include "sim/death.h"
 #include "sim/eggs.h"
 #include "sim/score.h"
 #include "sim/tasks.h"
@@ -244,11 +245,12 @@ static int unhorse(Game *g, uint16_t loser, uint16_t winner)
 {
     uint16_t t = game_word(g, F(loser, 0xD));
     uint16_t then = game_read_word(g, (uint16_t)(t + 0x10)), score = game_read_word(g, (uint16_t)(t + 0x16));
-    if (then != 0x74C3 || (score != 0xE6A8 && score != 0xE6B1)) return -1;
+    if ((then != 0x74C3 && then != 0x8279 && then != 0x827F) || (score != 0xE6A8 && score != 0xE6B1)) return -1;
     game_poke(g, F(loser, 2), game_peek(g, F(loser, 2)) & 0x7F);
     game_set_word(g, F(loser, 0x1A), 0);
     game_set_word(g, F(loser, 0x24), 0xEEC2);
-    eggs_lay(g, loser, winner);
+    if (then == 0x74C3) eggs_lay(g, loser, winner);
+    else death_player(g, loser, winner, then == 0x827F);
     score_add(g, game_word(g, F(winner, 0xD)), game_read(g, (uint16_t)(t + 0x2F)), score == 0xE6B1);
     return 0;
 }
