@@ -487,6 +487,25 @@ named; `game` checks each (section 3).
   straight into video RAM ($6895, $8209: runs of nibble pairs from
   [$0038], drawn twice 2 frames apart, then 6 frames, three times), its
   node's control set to $12, and its points ($7861: $0444).
+- **The shell** (`sim/start.c`, $5EEB-$65ED): the start buttons ($6359:
+  a coin's screen, $6301; a start takes credits, <$F2 and its CMOS copy
+  at $CD00, unless $CC06 is 9, counts audits 8 or 9 and 10, the lives
+  from $CC02, ends every other task), a game's set-up ($63E5: the screen
+  cleared from $9FFF down, the palette from [$E033], a line from the
+  ROM's own bytes, the scores, the extra-life interval from $CC00, the
+  settings by the difficulty's third, gravity 4, the waves' counters, the
+  platform maps from $E937/$EB98, the platforms' pictures from a bit
+  stream at [$0036] into video RAM, $E60A, with the ROM unselected; the
+  pads, the tasks of a game, the players and their lives' icons; a sum of
+  the program ROM, $6AC7; the secret code), the platforms met drawn again
+  ($65AE: the next bit of <$4B round, its template [[n]] + 6, the bottom
+  one's two more), game over ($61F0: the enemies back to their first
+  brains, "GAME OVER" 11 times), the attract mode's start ($627F: a
+  countdown held by player 1 right with player 2 left) and the demo
+  ($5EF8: pages from $5FCA, text blocks from [$5D7B + 2n] shown every 2
+  frames, demo riders, $60A3, and the demo players' brains $6021-$61EF in
+  `sim/brains.c`). Not ported: the system ROM's pages it goes to ($3B43
+  the high score table, $3B61 the entry, $D000 the attract pages).
 - **A secret code** ($6B20-$6BA5, in `sim/flow.c`): during a game a task
   watches both players' controls ($6BA6) for $2502, then $1204, then
   $0506 (player 1 left+flap with start 1 and player 2 right; start 2 with

@@ -95,8 +95,7 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   and bubbles, $E4E6), `collide.c` (the collision walks $837F/$83A4, the
   pair test $83D8 and the data test $DC21; a collision's handlers not yet),
   `scores.c` (the score digits, $E785; blitted with `game_blit`),
-  `flow.c` (the start buttons' task $6364 and a countdown $62AD, their
-  frequent paths; the secret code $6B25); the model also keeps the controls, PIA 0's $C807 and
+  `flow.c` (riders' turns to appear; the secret code $6B25); the model also keeps the controls, PIA 0's $C807 and
   its multiplexer (`game_controls`, $6BA6), `display.c` (the display
   list's nodes, $E2A1-$E38C), `rider.c` (the riders: in the air,
   $8F04/$8F3D, landing, on the ground, $8D4D, taking off and falling off;
@@ -111,7 +110,9 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   `text.c` (the ROM's text printer, $4A50), `waves.c` (between waves:
   the settings, messages, platforms, enemies and eggs; return addresses
   kept in task fields across sleeps, as the ROM does), `burn.c` (platforms
-  burning away, the lava bridges and flames); each mirrors a ROM routine's arithmetic exactly
+  burning away, the lava bridges and flames), `cycle.c` (the colour cycle),
+  `start.c` (the shell: start buttons, a game's set-up, game over, the
+  demo); each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
 - `web/` - page shell for the Emscripten build

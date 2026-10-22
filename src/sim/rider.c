@@ -23,11 +23,12 @@
 #define SKID 0xDD2C       /* the run animation's skid */
 
 #define RIDER_AIRBORNE 0x8EAF
+#define RIDER_FALL 0x8EC8 /* also where a demo rider starts */
 
 int rider_ported(uint16_t at)
 {
     return at == RIDER_FLAPPING || at == RIDER_GLIDING || at == RIDER_STANDING || at == RIDER_AIRBORNE ||
-           at == AWAY_GONE;
+           at == AWAY_GONE || at == RIDER_FALL;
 }
 
 static uint16_t field(uint16_t u, int off) { return (uint16_t)(u + off); }
@@ -494,6 +495,7 @@ StepResult rider_step(Game *g, uint16_t u, uint16_t at)
 {
     if (at == RIDER_STANDING) return ground(g, u);
     if (at == RIDER_AIRBORNE) return airborne(g, u);
+    if (at == RIDER_FALL) return fall_off(g, u);
     if (at == AWAY_GONE) { /* off the screen: the table's +$E routine */
         game_set_word(g, field(u, 7), 0x0096);
         uint16_t then = table(g, u, 0x0E);

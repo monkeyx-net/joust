@@ -23,4 +23,7 @@ uint16_t text_message_small(Game *g, uint8_t msg, uint8_t colour, uint16_t x);
    digit above 9 is character $0A, a blank) */
 uint16_t text_number_small(Game *g, uint8_t bcd, uint8_t colour, uint16_t x);
 
+/* $4A7F (through $4A50): character c in the small font */
+uint16_t text_char_small(Game *g, uint8_t c, uint8_t colour, uint16_t x);
+
 #endif

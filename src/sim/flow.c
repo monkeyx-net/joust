@@ -3,16 +3,6 @@
 #include "sim/spawn.h"
 #include "sim/tasks.h"
 
-#define STARTS_BEGIN 0x6359
-#define STARTS 0x6364
-#define COUNTDOWN 0x62AD
-#define COIN_SHOWN 0xA0B3 /* <$B3 */
-#define FRAMES 0xA011     /* <$11 */
-
-#define MET 0xA04B
-#define PLATFORMS_MET 0x65AE
-#define COMBO_START 0x62DA
-#define COMBO 0x62DF
 #define TURN_TAKE 0x8B0E
 #define TURN_WAIT 0x8B1A
 #define CODE_RETRY 0x6B20
@@ -24,12 +14,6 @@
 int flow_ported(uint16_t at)
 {
     switch (at) {
-    case STARTS_BEGIN:
-    case STARTS:
-    case COUNTDOWN:
-    case PLATFORMS_MET:
-    case COMBO_START:
-    case COMBO:
     case TURN_TAKE:
     case TURN_WAIT:
     case CODE_RETRY:
@@ -39,33 +23,6 @@ int flow_ported(uint16_t at)
     case CODE_LOOK: return 1;
     }
     return 0;
-}
-
-/* $6364 */
-static StepResult starts(Game *g)
-{
-    if ((int8_t)game_peek(g, COIN_SHOWN) > 0) return STEP_UNPORTED;
-    if (game_read(g, 0xC804) & 0x30) return STEP_UNPORTED;
-    return task_sleep(g, 1, STARTS);
-}
-
-/* $62AD */
-static StepResult countdown(Game *g, uint16_t u)
-{
-    game_poke(g, FRAMES, (uint8_t)(game_peek(g, FRAMES) + 1));
-    uint16_t d = game_word(g, (uint16_t)(u + 0xD));
-    if (d) {
-        game_set_word(g, (uint16_t)(u + 0xD), (uint16_t)(d - 1));
-        return task_sleep(g, 1, COUNTDOWN);
-    }
-    if (game_controls(g) == 0x0201) { /* player 1 right, player 2 left */
-        game_poke(g, (uint16_t)(u + 0x10), 0x3C);
-        return task_sleep(g, 1, COUNTDOWN);
-    }
-    uint8_t left = (uint8_t)(game_peek(g, (uint16_t)(u + 0x10)) - 1);
-    game_poke(g, (uint16_t)(u + 0x10), left);
-    if ((int8_t)left > 0) return task_sleep(g, 1, COUNTDOWN);
-    return STEP_UNPORTED; /* $62CE */
 }
 
 /* $6B90: wait for the controls `want`, carrying on at `then` */
@@ -120,18 +77,6 @@ static StepResult player_turn(Game *g, uint16_t u, uint8_t b)
 StepResult flow_step(Game *g, uint16_t u, uint16_t at)
 {
     switch (at) {
-    case STARTS_BEGIN:
-        task_kill_type(g, 0x48, 0xFF);
-        return task_sleep(g, 1, STARTS);
-    case STARTS: return starts(g);
-    case COUNTDOWN: return countdown(g, u);
-    case PLATFORMS_MET:
-        if (game_peek(g, MET)) return STEP_UNPORTED;
-        return task_sleep(g, 2, PLATFORMS_MET);
-    case COMBO_START: return task_sleep(g, 5, COMBO);
-    case COMBO:
-        if (game_controls(g) == 0x0201) return STEP_UNPORTED; /* $626B */
-        return task_sleep(g, 5, COMBO);
     case CODE_RETRY: return task_sleep(g, 30, CODE_1);
     case CODE_1: return code_wait(g, u, 0x2502, 0x6B2A);
     case CODE_2: return code_wait(g, u, 0x1204, 0x6B3A);

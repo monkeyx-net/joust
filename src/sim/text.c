@@ -43,3 +43,8 @@ uint16_t text_number_small(Game *g, uint8_t bcd, uint8_t colour, uint16_t x)
     if (a > 0x0A) a = 0x0A;
     return character(g, game_word(g, 0xA0D1), a, colour, x);
 }
+
+uint16_t text_char_small(Game *g, uint8_t c, uint8_t colour, uint16_t x)
+{
+    return character(g, FONT_SMALL, c, colour, x);
+}

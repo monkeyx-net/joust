@@ -681,6 +681,87 @@ int brain_enemy(Game *g, uint16_t u, uint16_t at)
             game_set_word(g, F(u, 0x24), 0x793C);
             controls(g, 0, 0);
             return 0;
+        /* ---- the demo's riders ($6021-$61EF) --------------------------------- */
+        case 0x6021: /* player 2: up to line $78, then flapping its way */
+            if (dec(g, F(u, 0x2D)) >= 0) { at = 0x603E; break; }
+            game_poke(g, F(u, 0x2D), (uint8_t)(peek(g, F(u, 0x2D)) + 1));
+            if ((uint16_t)(word(g, F(u, 0x11)) - 0xFFC0) & 0x8000) { at = 0x603E; break; }
+            /* fall through */
+        case 0x6032:
+            if (peek(g, F(u, 0xB)) > 0x78) {
+                game_set_word(g, F(u, 0x24), 0x605D);
+                game_poke(g, F(u, 0x2D), (uint8_t)((peek(g, F(u, 0x33)) >> 2) + 1));
+                controls(g, 0, 1);
+                return 0;
+            }
+            game_set_word(g, F(u, 0x24), 0x6043);
+            /* fall through */
+        case 0x603E:
+            controls(g, 0, 0);
+            return 0;
+        case 0x6043:
+            at = peek(g, F(u, 0x11)) & 0x80 ? 0x603E : 0x6032;
+            break;
+        case 0x605D:
+            if (dec(g, F(u, 0x2D))) {
+                controls(g, 0, 1);
+                return 0;
+            }
+            a = (uint8_t)(peek(g, F(u, 0x33)) >> 1);
+            game_poke(g, F(u, 0x33), a);
+            game_poke(g, F(u, 0x2D), a);
+            game_set_word(g, F(u, 0x24), 0x6021);
+            at = 0x603E;
+            break;
+        case 0x60E6: /* player 2 runs left, turns and stops */
+            if (!word(g, F(u, 0x20))) {
+                if ((int8_t)peek(g, F(u, 0x14)) > 0) controls(g, 0, 0);
+                else controls(g, 0x01, 0x01);
+                return 0;
+            }
+            if (peek(g, F(u, 0x14)) != 0xF8) { at = 0x60F2; break; }
+            game_set_word(g, F(u, 0x24), 0x610D);
+            /* fall through */
+        case 0x610D:
+            if (peek(g, F(u, 0x14)) & 0x80) { at = 0x60F2; break; }
+            game_set_word(g, F(u, 0x24), 0x6118);
+            /* fall through */
+        case 0x6118:
+            if (peek(g, F(u, 0x14)) || !(peek(g, F(u, 0xF)) & 0x80)) { at = 0x60F2; break; }
+            controls(g, 0, 0);
+            return 0;
+        case 0x60F2:
+            controls(g, 0xFF, 0);
+            return 0;
+        case 0x6170: { /* a demo enemy walks in for +$2B frames */
+            uint16_t n = word(g, F(u, 0x2B));
+            game_set_word(g, F(u, 0x2B), (uint16_t)(n - 1));
+            if ((int16_t)n <= 1) {
+                game_set_word(g, F(u, 0x24), ram_word(g, (uint16_t)(word(g, F(u, 0xD)) + 2)));
+                controls(g, 0, 0);
+                return 0;
+            }
+            controls(g, peek(g, F(u, 0x14)) == 2 ? 0 : 1, 0);
+            return 0;
+        }
+        case 0x61B9: /* player 1 walks, then faces the pterodactyl */
+            if (peek(g, F(u, 0x2D))) {
+                dec(g, F(u, 0x2D));
+                if (peek(g, F(u, 0x14))) { at = 0x61DA; break; }
+                controls(g, 0x01, 0);
+                return 0;
+            }
+            if (!peek(g, F(u, 0x14)) || (peek(g, F(u, 0xF)) & 0x80)) { at = 0x61DA; break; }
+            controls(g, 0xFF, 0);
+            return 0;
+        case 0x61DA:
+            for (x = u; (x = word(g, x)) != 0;)
+                if (peek(g, F(x, 2)) == 0x97) {
+                    game_poke(g, F(u, 0xF), peek(g, F(x, 0xF)));
+                    break;
+                }
+            controls(g, 0, 0);
+            return 0;
         default:
             return -1;
         }
