@@ -6,7 +6,7 @@
  * (ROM status, a two-player input tester, the graphics presets, and pages of
  * the images decoded from the ROM: Select+R1 / F2 steps the pages).
  *
- *   joust [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N] [--c-game]
+ *   joust [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N] [--emulate]
  *         [--input script.txt] [--frames N] [--screenshot out.png]
  *   joust --check-rom <dir|zip>
  *   joust --dump-rom <dir|zip> <first> <last>
@@ -19,8 +19,9 @@
  * [left] [right] [flap] [left2] [right2] [flap2] [menu]", each holding from
  * that frame until the next line (live controls still quit).
  * --extract writes what the C game needs from the ROM set to an assets folder
- * (assets/extract.h; default: assets/ next to the program); --c-game then
- * runs from it alone (extracting it first if the ROM set is there).
+ * (assets/extract.h; default: assets/ next to the program); the game in C
+ * (the default) runs from it alone, extracting it first if the ROM set is
+ * there. --emulate runs the ROM on the emulated board instead.
  * --dump-rom prints "ADDR BYTE" lines (hex) for main-CPU addresses first..last,
  * the format the MAME probe writes (src/tests/mame/rom_map_probe.lua).
  * --list-images prints the image catalogue as "ADDR:W:H name" (hex address,
@@ -98,7 +99,8 @@ typedef struct {
     int cmos_wait;       /* frames until changed CMOS is written */
     long idle;           /* frames of attract mode without input (the controls page) */
     /* --c-game: the game in C (sim/), the board only for its sound */
-    int c_game;
+    int c_game;          /* the game in C (the default; --emulate for the emulated board) */
+    int emulate;
     int c_ready;         /* loaded from the board at its frame loop's start */
     int c_stopped;       /* a step not ported: the C game stops */
     Game cg;
@@ -725,7 +727,8 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--rom") && i + 1 < argc) rom_arg = argv[++i];
         else if (!strcmp(argv[i], "--page") && i + 1 < argc) g.page = (int)strtol(argv[++i], NULL, 10);
         else if (!strcmp(argv[i], "--test-card")) g.test_card = 1;
-        else if (!strcmp(argv[i], "--c-game")) g.c_game = 1;
+        else if (!strcmp(argv[i], "--c-game")) g.c_game = 1; /* (the default; kept for scripts) */
+        else if (!strcmp(argv[i], "--emulate")) g.emulate = 1;
         else if (!strcmp(argv[i], "--input") && i + 1 < argc) {
             if (load_script(argv[++i])) return 2;
         }
@@ -736,7 +739,7 @@ int main(int argc, char **argv)
             }
         } else {
             fprintf(stderr,
-                    "usage: %s [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N] [--c-game]\n"
+                    "usage: %s [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N] [--emulate]\n"
                     "          [--input script.txt] [--frames N] [--screenshot out.png]\n"
                     "       %s --check-rom <dir|zip>\n"
                     "       %s --dump-rom <dir|zip> <first> <last>\n"
@@ -765,6 +768,7 @@ int main(int argc, char **argv)
     }
     if (g.page < 0 || g.page > g.image_pages) g.page = 0;
     if (g.page) g.test_card = 1;
+    g.c_game = !g.emulate;
     if (g.c_game && !g.test_card && !c_assets_open(argv[0]) && !c_start_assets()) {
         /* the C game from the assets: no ROM set needed */
     } else {

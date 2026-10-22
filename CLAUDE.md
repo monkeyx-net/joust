@@ -47,9 +47,9 @@ cmake -S . -B build && cmake --build build -j     # build
 ctest --test-dir build                            # all tests
 ctest --test-dir build -L rom                     # tests needing the ROM set (roms/joust.zip)
 ctest --test-dir build -L mame                    # tests needing MAME + the ROM set
-build/joust --windowed                            # play (finds roms/joust.zip in dev builds)
 build/joust --windowed --test-card                # the test card and image pages
-build/joust --windowed --c-game                   # the game in C (sim/), from assets/ (extracted once)
+build/joust --windowed                            # the game in C (sim/), from assets/ (extracted once)
+build/joust --windowed --emulate                  # the ROM on the emulated board
 build/joust --extract roms/joust.zip [dir]        # program, factory CMOS and sounds into assets/
 build/joust --windowed --gfx hd-glow              # enhanced graphics (presets: classic ... hd-glow-crt)
 SDL_VIDEODRIVER=dummy build/joust --frames 60 --screenshot out.png   # headless screenshot
@@ -66,9 +66,9 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
 
 ## Layout (`src/`)
 
-- `main.c` - SDL setup, fixed 60 Hz loop running one board frame per tick
-  (or with `--c-game` one frame of the C game, sim/cgame.c, from its own
-  power-on, the board then only sounding),
+- `main.c` - SDL setup, fixed 60 Hz loop running one frame of the C game
+  per tick (sim/cgame.c, from its own power-on, from the extracted
+  assets; or with `--emulate` one board frame),
   the graphics pipeline, CMOS saving, the controls page over the attract
   mode (after 30 s idle; `$A09F` = 2 tells a game from the attract mode),
   the test card (`--test-card`),

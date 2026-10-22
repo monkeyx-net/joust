@@ -411,7 +411,8 @@ named; `game` checks each (section 3).
   sound, the layers, both passes, the chaining). Hooks give the
   interrupts' places among the steps and how far the second pass goes:
   a test, the board's; the C game alone, its own schedule.
-- **The C game alone** (`sim/cgame.c`, `joust --c-game`): from the reset
+- **The C game alone** (`sim/cgame.c`, the default; `--emulate` runs the
+  board instead): from the reset
   in C ($E03D, `cgame_power_on`: RAM cleared, the ROM selected, the
   multiplexer, the debounce, the task blocks, the display lists, the
   palette, the minute's count, the credits from the CMOS's copy, the
@@ -758,5 +759,5 @@ named; `game` checks each (section 3).
 | S1 | Task steps in C: the players (flap, gravity, running, braking, the joust's outcome), enemies (Bounders, Hunters, Shadow Lords), eggs and hatching, the pterodactyl, the troll's hand, platforms, waves and their tables, scoring, extra lives, two players | `game` on scripted games (and a second, longer one), `routines` |
 | I1 | (done 2026-10-22: `sim/irq.c`; the test mode's entry not ported) The interrupt in C: the display lists to the blitter (the C game draws with `gfx/williams.c`'s blitter into video RAM laid out as the arcade's), the random stir, the controls and coins | Each routine checked per call (as Defender's) |
 | F1 | (2026-10-22: `sim/frame.c`, `frame` tests, `--c-game` playable from its own power-on) The frame in C (both passes, the sound queue, the layers) and `--c-game`: the C game alone, from power-on | `frame`: the C game against the board every frame |
-| C3 | (2026-10-22: attract mode, high scores, the operator's pages, the sounds as WAVs done in C; the default still the emulation) Attract mode, high-score table and entry, operator pages, sounds from the WAVs; the C game becomes the default, the release needs only `assets/` | Full scripted run matches; release with `assets/` only |
+| C3 | (done 2026-10-22: attract mode, high scores, the operator's pages, the sounds as WAVs in C; the C game is the default, `--emulate` the board) Attract mode, high-score table and entry, operator pages, sounds from the WAVs; the C game becomes the default, the release needs only `assets/` | Full scripted run matches; release with `assets/` only |
 | P6 | Release: packages, PortMaster submission, GitHub release | Published |

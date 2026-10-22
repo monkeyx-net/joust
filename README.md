@@ -4,11 +4,10 @@ A C11 / SDL2 port of the 1982 Williams arcade game for Linux handhelds
 (PortMaster: ArkOS, ROCKNIX, muOS, Knulli), desktops (Linux, Windows) and the
 web, checked against the original ROM running in MAME.
 
-**Status:** playable. The game is your ROM's own code on an emulated Williams
-board (6809 main board, 6808 sound board), written in C and checked against
-MAME cycle for cycle; the game itself is also rewritten in C, routine by
-routine (`--c-game`, checked step by step and frame by frame against the
-emulated board); the port adds enhanced graphics presets, pad controls,
+**Status:** playable. The game is rewritten in C, routine by routine, from
+the arcade's program (checked step by step and frame by frame against an
+emulated Williams board, which is itself checked against MAME cycle for
+cycle and is still there with `--emulate`); the port adds enhanced graphics presets, pad controls,
 CMOS saving and packaging for handhelds, desktops and the web. See
 [JOUST_PORT_PLAN.md](JOUST_PORT_PLAN.md).
 
@@ -48,7 +47,7 @@ Pads use SDL's game controller database; set `JOUST_GAMECONTROLLERDB` to a
 
 ```bash
 build/joust [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N]
-            [--c-game] [--input script.txt] [--frames N] [--screenshot out.png]
+            [--emulate] [--input script.txt] [--frames N] [--screenshot out.png]
 build/joust --check-rom roms/joust.zip            # verify a ROM set
 build/joust --extract roms/joust.zip [dir]        # what --c-game needs, into assets/
 build/joust --dump-rom roms/joust.zip D000 D0FF   # main-CPU ROM bytes, "ADDR BYTE" hex
@@ -59,12 +58,13 @@ build/joust --list-images                         # the image catalogue, ADDR:W:
   `hd-smooth`, `hd-glow`, `hd-glow-crt`.
 - `--test-card`: ROM status, an input tester, the presets, and pages of the
   images decoded from the ROM (`--page N`, or Select + R1 / F2 to step).
-- `--c-game`: the game rewritten in C (`src/sim/`) instead of the
-  emulated board. It runs from `assets/` (the program image, factory
-  settings and sounds, extracted once from your ROM set with `--extract`,
-  or automatically on the first `--c-game` with the set present); then
-  the ROM set is no longer needed. The self-test, the operator's test
-  mode, bookkeeping and adjustments are in C too.
+- The game runs rewritten in C (`src/sim/`) from `assets/`: the program
+  image, factory settings and sounds, extracted once from your ROM set
+  (automatically on the first start with the set present, or with
+  `--extract`); after that the ROM set is no longer needed. The self-test,
+  the operator's test mode, bookkeeping and adjustments are in C too.
+- `--emulate`: run your ROM on the emulated board instead (cycle-exact
+  against MAME); it needs the ROM set every time.
 - `--input`, `--frames`, `--screenshot`: scripted, headless runs
   (`SDL_VIDEODRIVER=dummy`); see the comment at the top of `src/main.c`.
 
