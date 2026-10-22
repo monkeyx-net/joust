@@ -46,6 +46,8 @@ uint8_t game_read(const Game *g, uint16_t addr)
     if (addr >= 0xD000) return g->rom[addr];
     if (addr == 0xC804) return (uint8_t)(((g->mux ? g->inp1 : g->inp2) & 0x0F) | (g->in0 & 0x30));
     if (addr == 0xC807) return g->pia0_crb;
+    if (addr == 0xC80C) return g->in2;
+    if (addr == 0xCB00) return g->beam ? g->beam(g->user) : g->vcount;
     if (addr >= 0xCC00) return g->cmos[addr - 0xCC00];
     return 0;
 }
@@ -140,12 +142,14 @@ static void cmos_put(Game *g, uint16_t x, uint8_t v)
     game_poke(g, x, (uint8_t)(v >> 4));
 }
 
-void game_audit(Game *g, uint8_t n)
+void game_audit(Game *g, uint8_t n) { game_audit_add(g, n, 1); }
+
+void game_audit_add(Game *g, uint8_t n, uint8_t a)
 {
     uint16_t x = (uint16_t)(0xCCFC + (n & 0x0F) * 6);
     uint8_t hi = cmos_byte(g, x), mid = cmos_byte(g, (uint16_t)(x + 2)), lo = cmos_byte(g, (uint16_t)(x + 4));
     int c, h;
-    lo = game_add(lo, 1, 0, &c, &h);
+    lo = game_add(lo, a, 0, &c, &h);
     lo = game_daa(lo, &c, h);
     mid = game_add(mid, 0, c, &c, &h);
     mid = game_daa(mid, &c, h);

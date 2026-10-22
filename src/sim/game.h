@@ -25,6 +25,7 @@ typedef struct {
        (bits 4-5 of $C804), and each player's (bits 0-3, by the
        multiplexer: CB2, set through $C807, high for player 1) */
     uint8_t in0, inp1, inp2;
+    uint8_t in2;        /* $C80C: auto-up, advance, coins, the high score reset, slam */
     uint8_t pia0_crb;   /* $C807 */
     int mux;            /* CB2 as $C807 last set it */
     uint8_t cmos[1024]; /* $CC00-$CFFF: nibbles, | $F0 as the board keeps them */
@@ -32,6 +33,17 @@ typedef struct {
        step reads it ($81C4, a platform's burn), the tests copy the board's */
     uint16_t y;
     uint8_t b; /* the same for B ($D15B, the attract mode's border lights) */
+    /* the interrupt's: S as it comes in (saved at <$1F), and the hardware
+       it drives: the palette ($C000-$C00F) and the blitter (game_blit) */
+    uint16_t irq_s;
+    uint8_t palette[16];
+    /* the frame loop's sound commands to the sound board ($C80E: $FF, then
+       the command), for the platform to play */
+    void (*on_sound)(void *user, uint8_t command);
+    /* $CB00, the beam's line as the interrupt reads it: `beam` if set
+       (a test: the board's reads in turn), else vcount */
+    uint8_t (*beam)(void *user);
+    uint8_t vcount;
     /* optional, for tests: called before each RAM write the C game makes,
        and on each RAM read */
     void (*on_write)(void *user, uint16_t addr);
@@ -74,6 +86,8 @@ uint8_t game_daa(uint8_t a, int *c, int h);
 /* $4110 (via $3B2B): CMOS audit counter n (3 BCD bytes as 6 nibbles at
    $CCFC + 6n) plus 1. */
 void game_audit(Game *g, uint8_t n);
+/* $4116 (via $3B28): the same, plus a (BCD) */
+void game_audit_add(Game *g, uint8_t n, uint8_t a);
 
 /* $40E1 (through $3B31): a byte from the two CMOS nibbles at x */
 uint8_t game_cmos_byte(const Game *g, uint16_t x);

@@ -70,6 +70,8 @@ add_library(joust_core STATIC
   src/sim/attract.c
   src/sim/hiscores.c
   src/sim/troll.c
+  src/sim/irq.c
+  src/sim/frame.c
   src/emu/m6809.c
   src/emu/pia6821.c
   src/emu/board.c
@@ -169,6 +171,11 @@ if(EXISTS "${JOUST_ROM}")
   target_link_libraries(test_routines PRIVATE joust_core)
   add_test(NAME routines COMMAND test_routines "${JOUST_ROM}")
   set_tests_properties(routines PROPERTIES LABELS rom)
+  add_executable(test_frame src/tests/test_frame.c)
+  target_link_libraries(test_frame PRIVATE joust_core)
+  add_test(NAME frame COMMAND test_frame "${JOUST_ROM}")
+  add_test(NAME frame_two COMMAND test_frame "${JOUST_ROM}" two)
+  set_tests_properties(frame frame_two PROPERTIES LABELS rom TIMEOUT 600)
   message(STATUS "ROM set found at ${JOUST_ROM}: ROM tests enabled")
 else()
   message(STATUS "No ROM set at ${JOUST_ROM}: ROM tests disabled (put joust.zip in roms/)")

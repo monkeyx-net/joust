@@ -396,6 +396,21 @@ named; `game` checks each (section 3).
   ($6DFE by +$1C, two easy waves; <$AD from $6DE2) and the manager. The
   ROM keeps return addresses across sleeps in +$F and +$11 (A and B in
   +$15); the C uses the same fields, and a stack within a step.
+- **The interrupt and the frame in C** (`sim/irq.c`, `sim/frame.c`):
+  the interrupt ($E38D) saves S at <$1F, stirs the random state, and at
+  the top of the frame copies the palette, counts a minute of play
+  (audit 6), the tilt timer, samples and debounces the switches ($C80C
+  into <$B4-<$BC, <$8B) and handles a new press: coins ($4309/$4303/
+  $42FD: audits 1-3, units from the CMOS's coin settings into <$F3/<$F4,
+  credits by $CC0E's units, bonus credits by $CC10's, audit 4, then
+  $42E7: <$F2 and its CMOS copy, the sound $EF1B, <$B3, the credits
+  shown); the high score reset (held 24 delays: the best entry back to
+  $3E42's); the advance (the test mode, $F342: not ported). Then it
+  blits the list before band by band behind the beam ($CB00), clearing
+  its flag after the last. The frame ($E0E2) as above (the list, the
+  sound, the layers, both passes, the chaining). Hooks give the
+  interrupts' places among the steps and how far the second pass goes:
+  a test, the board's; the C game alone, its own schedule.
 - **Burning and the lava's fire** (`sim/burn.c`): $81A0 (a platform
   burning away: its picture flashed five times, $2A every other 10
   frames; an erase node, $8240, whose line comes from the CPU's Y as the
@@ -649,6 +664,16 @@ named; `game` checks each (section 3).
   riderless mount's brain (20000 near its knight or not: about 700 pick
   it up, 5600 hop); $77BE, points placed among two displays near them
   (20000: about 9900 wait).
+- **The C game alone** (label `rom`): `frame` and `frame_two` load the C
+  game from the board's RAM at its first frame-loop start ($E0E2) and run
+  it frame by frame (every step, the interrupt and the loop in C) while
+  the board plays the scripted game; a hook gives the C frame the
+  board's timing (the interrupts' places, S and beam reads, the controls
+  at each dispatch, where the second pass stopped); all of RAM and the
+  CMOS must equal the board's at its next $E0E2. 8248 of 8250 frames
+  match (`frame_two`: 8242 of 8246); the rest are interrupts inside a
+  random-number step (the stir lands mid-update), after which the C game
+  is loaded again. At least 97% must match.
 - **MAME** (label `mame`): `mame_rom_map`, `mame_capture` (video RAM and
   palette decoding against MAME snapshots), `mame_images` (the blitter
   against MAME's, per image and mode); later per-frame RAM traces of
@@ -671,7 +696,7 @@ named; `game` checks each (section 3).
 | X1 | Extractor (`joust --extract`, as Defender's `src/assets/extract.c`): the images (the catalogue, decoded through the blitter), fonts, palette and sounds (WAVs recorded from the emulated sound board) to `assets/`, then the game's tables as the C game needs them | `extract`; the C game runs from `assets/` alone |
 | S0 | (started 2026-10-21) The C game's foundation: a model of all of RAM (`sim/game.c`), the task kernel (`sim/tasks.c`), the `game` and `routines` harnesses; first tasks: the ROM check (`checksum.c`), the lava (`lava.c`), the collision walks and tests (`collide.c`) | `game`, `routines` |
 | S1 | Task steps in C: the players (flap, gravity, running, braking, the joust's outcome), enemies (Bounders, Hunters, Shadow Lords), eggs and hatching, the pterodactyl, the troll's hand, platforms, waves and their tables, scoring, extra lives, two players | `game` on scripted games (and a second, longer one), `routines` |
-| I1 | The interrupt in C: the display lists to the blitter (the C game draws with `gfx/williams.c`'s blitter into video RAM laid out as the arcade's), the random stir, the controls and coins | Each routine checked per call (as Defender's) |
-| F1 | The frame in C (both passes, the sound queue, the layers) and `--c-game`: the C game alone, from power-on | `frame`: the C game against the board every frame |
+| I1 | (done 2026-10-22: `sim/irq.c`; the test mode's entry not ported) The interrupt in C: the display lists to the blitter (the C game draws with `gfx/williams.c`'s blitter into video RAM laid out as the arcade's), the random stir, the controls and coins | Each routine checked per call (as Defender's) |
+| F1 | (started 2026-10-22: `sim/frame.c`, `frame` tests) The frame in C (both passes, the sound queue, the layers) and `--c-game`: the C game alone, from power-on | `frame`: the C game against the board every frame |
 | C3 | Attract mode, high-score table and entry, operator pages, sounds from the WAVs; the C game becomes the default, the release needs only `assets/` | Full scripted run matches; release with `assets/` only |
 | P6 | Release: packages, PortMaster submission, GitHub release | Published |
