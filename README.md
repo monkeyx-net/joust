@@ -49,7 +49,7 @@ Pads use SDL's game controller database; set `JOUST_GAMECONTROLLERDB` to a
 build/joust [--windowed] [--gfx preset] [--rom path] [--test-card] [--page N]
             [--emulate] [--input script.txt] [--frames N] [--screenshot out.png]
 build/joust --check-rom roms/joust.zip            # verify a ROM set
-build/joust --extract roms/joust.zip [dir]        # what --c-game needs, into assets/
+build/joust --extract roms/joust.zip [dir]        # what the C game needs, into assets/
 build/joust --dump-rom roms/joust.zip D000 D0FF   # main-CPU ROM bytes, "ADDR BYTE" hex
 build/joust --list-images                         # the image catalogue, ADDR:W:H
 ```

@@ -19,19 +19,20 @@ game, the extractor and their tests are built; follow its patterns.
 
 ## Ground Rules
 
-- **The game is being rewritten in C** (plan decision 6), as the Defender
-  port's is: game logic from the ROM's behaviour, routine by routine, each
-  mirroring the ROM routine's arithmetic and order of stores, checked step
-  by step against the emulated board (`src/emu/`). Until it reaches parity
-  the emulated board runs the game. MAME is the reference for the
+- **The game is rewritten in C** (plan decision 6, `src/sim/`): game logic
+  from the ROM's behaviour, routine by routine, each mirroring the ROM
+  routine's arithmetic and order of stores, checked step by step and frame
+  by frame against the emulated board (`src/emu/`, still there as
+  `--emulate`). The C game is the default. MAME is the reference for the
   emulation: changes to `emu/` must keep `mame_emu` (and the other `mame`
   tests) passing. Write all emulation from the hardware's behaviour, not
   from MAME's source.
-- **The ROM set is to be read once** (plan decision 1): `joust --extract`
-  (phase X1, not written yet) will write pictures, fonts, palette, sounds
-  and tables to `assets/`, which the C game reads instead of the ROM. No
-  ROM-derived data in the repo, the binary or the packages: not sprites,
-  fonts, tables or sounds; the extractor's tables name ROM addresses only.
+- **The ROM set is read once** (plan decision 1): `joust --extract` (or the
+  first start with the set present) writes the program image, the factory
+  CMOS and the sounds to `assets/`, which the C game reads instead of the
+  ROM. No ROM-derived data in the repo, the binary or the packages: not
+  sprites, fonts, tables or sounds; the extractor's tables name ROM
+  addresses only.
 - **All new code and tooling is C** (built with CMake). The one exception is
   MAME probe scripts, which must be Lua (MAME's scripting language); they only
   dump RAM to text files, and C or CMake does the comparing.
