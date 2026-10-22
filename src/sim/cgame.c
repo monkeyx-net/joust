@@ -28,11 +28,32 @@ static void interrupts(void *ctx, Game *g, uint16_t task)
     }
 }
 
+void cgame_start(CGame *c)
+{
+    operator_reset(&c->op);
+    c->operating = 1;
+}
+
 FrameResult cgame_frame(CGame *c, uint16_t *task)
 {
+    if (c->operating) {
+        operator_frame(&c->op, c->g);
+        if (c->picture) c->picture(c->user, c->g);
+        if (c->op.done) { /* the reboot ($E000) */
+            c->operating = 0;
+            cgame_power_on(c->g);
+        }
+        return FRAME_DONE;
+    }
     FrameHooks h = { c, interrupts, NULL };
     c->g->beam = NULL;
-    return frame_run(c->g, &h, task);
+    FrameResult r = frame_run(c->g, &h, task);
+    if (c->advance) { /* $F342 */
+        c->advance = 0;
+        operator_test_mode(&c->op);
+        c->operating = 1;
+    }
+    return r;
 }
 
 void cgame_power_on(Game *g)

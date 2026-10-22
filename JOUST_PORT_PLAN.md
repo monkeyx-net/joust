@@ -428,7 +428,37 @@ named; `game` checks each (section 3).
   (a first `--c-game` with the ROM set extracts them next to the program);
   the CMOS saved as the board's. 30000 frames of scripted play and
   attract mode run with no step left to the ROM (about 1200 frames a
-  second, headless). Not ported: the test mode (the advance switch).
+  second, headless). The self-test at the start and the test mode on the
+  advance switch are the system program's (below).
+- **The system program** (`sim/operator.c`: the Williams system ROM and
+  $F000-$FFFF beside the game): straight code with busy waits and the
+  interrupts off in the ROM, a state machine stepped a frame at a time in
+  C (a $F945 delay unit about 0.6 frames, a $F1D0 unit about 25.7). The
+  reset ($F025: the palette from $F015, two passes of the RAM test's
+  generator over $0000-$BFFF, the ROM test by $F320's block sums, "INITIAL
+  TESTS INDICATE: OPERATIONAL" for 7 units), the CMOS's check ($3D36: the
+  operator's message and the adjustments by their nibble sums + $37; bad
+  adjustments restored from $3C11, then the audits cleared if 4 are not
+  BCD, the tables reset from $3E42/$3EBF if 8 entries are bad, a message
+  waiting for the advance; every time the tables' bad entries deleted,
+  $3FC1, today's reset from $3F0C, the best one rebuilt from the first if
+  bad), then the game ($E000). The test mode (the advance switch; with
+  auto-up the bookkeeping at once): the ROM test, the RAM test until the
+  advance, the CMOS test ($FE4A: six passes of $FEAD's numbers written and
+  read back, the CMOS restored from a copy at $9C00), the sound test
+  (commands $3E, $3D, ... a bit low each, in turn with auto-up), the
+  switch test ($F781: the ports' changes named or erased), the colour RAM
+  test, the crosshatch, red, green and blue, the colour bars, the
+  bookkeeping (ten audits, BCD with leading blanks, and the average game
+  time by a BCD long division, $FA27), the adjustments (player 1's stick
+  moves the cursor, skipping the coin units unless the coinage is 0;
+  player 2's steps the value within $FC96's limits; the coinage sets the
+  units from $FD97's presets, 9 is free play; auto-repeat after 5 or 8
+  waits), then ($3C57) the special entries: clear the audits or the high
+  scores, the operator's two message lines (the initials input, then the
+  line's column moved with the stick), the best one's name, the factory
+  settings (by spoiling the adjustments' sum for the check). Not ported:
+  $CC1F's endless self-test loop, the LEDs.
 - **Burning and the lava's fire** (`sim/burn.c`): $81A0 (a platform
   burning away: its picture flashed five times, $2A every other 10
   frames; an erase node, $8240, whose line comes from the CPU's Y as the
@@ -684,6 +714,12 @@ named; `game` checks each (section 3).
   riderless mount's brain (20000 near its knight or not: about 700 pick
   it up, 5600 hop); $77BE, points placed among two displays near them
   (20000: about 9900 wait).
+- **The system program** (label `rom`): `operator` runs its ROM routines
+  on the emulated CPU against the C ones: the CMOS's check on 300 random
+  corruptions (74 end with a message), the tables' check and reset, the
+  CMOS test, 2000 BCD averages, the bookkeeping's and the adjustments'
+  pages on random audits and settings, 2000 cursor moves and value steps,
+  the crosshatch and bars, the sound test's step, 300 switch looks.
 - **The C game alone** (label `rom`): `frame` and `frame_two` load the C
   game from the board's RAM at its first frame-loop start ($E0E2) and run
   it frame by frame (every step, the interrupt and the loop in C) while
@@ -718,5 +754,5 @@ named; `game` checks each (section 3).
 | S1 | Task steps in C: the players (flap, gravity, running, braking, the joust's outcome), enemies (Bounders, Hunters, Shadow Lords), eggs and hatching, the pterodactyl, the troll's hand, platforms, waves and their tables, scoring, extra lives, two players | `game` on scripted games (and a second, longer one), `routines` |
 | I1 | (done 2026-10-22: `sim/irq.c`; the test mode's entry not ported) The interrupt in C: the display lists to the blitter (the C game draws with `gfx/williams.c`'s blitter into video RAM laid out as the arcade's), the random stir, the controls and coins | Each routine checked per call (as Defender's) |
 | F1 | (2026-10-22: `sim/frame.c`, `frame` tests, `--c-game` playable from its own power-on) The frame in C (both passes, the sound queue, the layers) and `--c-game`: the C game alone, from power-on | `frame`: the C game against the board every frame |
-| C3 | Attract mode, high-score table and entry, operator pages, sounds from the WAVs; the C game becomes the default, the release needs only `assets/` | Full scripted run matches; release with `assets/` only |
+| C3 | (2026-10-22: attract mode, high scores, the operator's pages, the sounds as WAVs done in C; the default still the emulation) Attract mode, high-score table and entry, operator pages, sounds from the WAVs; the C game becomes the default, the release needs only `assets/` | Full scripted run matches; release with `assets/` only |
 | P6 | Release: packages, PortMaster submission, GitHub release | Published |

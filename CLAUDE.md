@@ -122,7 +122,9 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   troll's hand), `irq.c` (the interrupt: palette, switches, coins, the
   display list's blits), `frame.c` (the frame loop: both passes, the
   sound queue, the layers; hooks for the interrupts' timing), `cgame.c`
-  (the C game alone: the interrupt on a fixed schedule); each mirrors a ROM routine's arithmetic exactly
+  (the C game alone: the interrupt on a fixed schedule), `operator.c`
+  (the system program: self-test, CMOS check, test mode, bookkeeping,
+  adjustments, as a frame-stepped state machine); each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
 - `web/` - page shell for the Emscripten build
@@ -198,6 +200,10 @@ Every change keeps `ctest` green.
   pass stopped); all of RAM and the CMOS at each $E0E2; 97% must match
   (the rest: interrupts inside a random step). `DBG=1` lists differences,
   `WATCH=n` the hooks around board frame n.
+- `operator` - label `rom`: the system program's routines (CMOS check,
+  tables, CMOS test, averages, bookkeeping and adjustment pages, cursor and
+  value steps, test screens, switch and sound steps) on the emulated CPU
+  against sim/operator.c's, on random CMOS and switches
 - `mame_emu` - label `mame`: the emulated board from power-on with the primed
   CMOS and the probes' script: all 20000 random-state changes in MAME's order
   and frames 1500/1650/1800 pixel for pixel. Inputs a probe sets in a frame

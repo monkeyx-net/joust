@@ -38,4 +38,11 @@ StepResult hiscores_step(Game *g, uint16_t task, uint16_t at);
 /* $464F: the entries after a game (the game over task) */
 StepResult hiscores_game_over(Game *g, uint16_t task);
 
+/* $43F6 / $4438 (the routine at y + 6): one look at the controls for the
+   letters' input block at y ([0] letters left, [1] entered, [2-3] the
+   range, [4] $C807 for the player, [5] the colour, [8] the screen, [$A]
+   the cursor, [$E] a delay, [$F] the letters); *a, *b the ROM's A and B
+   (in and out), *x its X; 1 when the last letter is in */
+int hiscores_look(Game *g, uint16_t y, uint8_t *a, uint8_t *b, uint16_t *x);
+
 #endif

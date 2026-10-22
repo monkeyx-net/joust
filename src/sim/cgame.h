@@ -6,13 +6,16 @@
  * work, and after the passes at lines $40, $80 and $C0, drawing the
  * list's first three bands), so the second pass always runs to the
  * list's end. The picture is taken when the frame starts, after its
- * interrupt: the whole list before drawn.
+ * interrupt: the whole list before drawn. The advance switch hands the
+ * frames to the system program's test mode (sim/operator.c), which ends
+ * with a reboot into the game.
  */
 #ifndef JOUST_CGAME_H
 #define JOUST_CGAME_H
 
 #include "sim/frame.h"
 #include "sim/game.h"
+#include "sim/operator.h"
 
 typedef struct {
     Game *g;
@@ -20,8 +23,14 @@ typedef struct {
        picture to show) */
     void (*picture)(void *user, const Game *g);
     void *user;
-    int advance; /* the advance switch was pressed (the test mode: not ported) */
+    int advance;   /* the advance switch was pressed: the test mode next */
+    int operating; /* the system program runs (sim/operator.c), not the game */
+    Operator op;
 } CGame;
+
+/* From the reset: the self-test and the CMOS's check (sim/operator.c),
+   then the game. */
+void cgame_start(CGame *c);
 
 /* $E03D-$E0E0: the state at the frame loop's first start after a reset
    (RAM cleared to $BF7F, the ROM selected, PIA 0's multiplexer, the

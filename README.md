@@ -63,8 +63,8 @@ build/joust --list-images                         # the image catalogue, ADDR:W:
   emulated board. It runs from `assets/` (the program image, factory
   settings and sounds, extracted once from your ROM set with `--extract`,
   or automatically on the first `--c-game` with the set present); then
-  the ROM set is no longer needed. The operator's test mode is not there
-  yet.
+  the ROM set is no longer needed. The self-test, the operator's test
+  mode, bookkeeping and adjustments are in C too.
 - `--input`, `--frames`, `--screenshot`: scripted, headless runs
   (`SDL_VIDEODRIVER=dummy`); see the comment at the top of `src/main.c`.
 
@@ -168,6 +168,8 @@ ctest --test-dir build -L mame      # needs MAME 0.289 and the ROM set
 - `routines` (`rom`): ROM routines and task steps on random inputs against
   the C ones (collisions, scoring, brains, the waves, the high score entry,
   the troll and more).
+- `operator` (`rom`): the system program (self-test, CMOS check, test
+  mode, bookkeeping, adjustments) routine by routine against the ROM's.
 - `frame`, `frame_two` (`rom`): the C game alone, frame by frame against
   the board, given the board's interrupt timing.
 - `mame_rom_map`, `mame_capture`, `mame_images`, `mame_prng`, `mame_emu`

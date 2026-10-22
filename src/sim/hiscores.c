@@ -344,7 +344,7 @@ static uint8_t letter(Game *g, uint16_t y, uint8_t a)
 
 /* $43F6 / $4438: one look at the controls; *a and *b as the ROM leaves
    A and B, *x X; 1 done (the carry) */
-static int look(Game *g, uint16_t y, uint8_t *a, uint8_t *b, uint16_t *x)
+int hiscores_look(Game *g, uint16_t y, uint8_t *a, uint8_t *b, uint16_t *x)
 {
     uint8_t c;
     if (word(g, F(y, ROUTINE)) == 0x43F6) {
@@ -423,7 +423,7 @@ static StepResult initials(Game *g, uint16_t u);
 static StepResult entry_look(Game *g, uint16_t u, uint8_t a, uint8_t b)
 {
     uint16_t y = F(u, 7), x = 0;
-    if (look(g, y, &a, &b, &x)) return carry_on(g, u, a, b, x);
+    if (hiscores_look(g, y, &a, &b, &x)) return carry_on(g, u, a, b, x);
     game_set_word(g, F(u, 0x36), y);
     poke(g, F(u, 0x32), a);
     poke(g, F(u, 0x33), b);

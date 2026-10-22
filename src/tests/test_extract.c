@@ -106,7 +106,9 @@ int main(int argc, char **argv)
     memcpy(b.cmos, board.cmos, sizeof cmos);
     cgame_power_on(&a);
     cgame_power_on(&b);
-    CGame ca = { &a, NULL, NULL, 0 }, cb = { &b, NULL, NULL, 0 };
+    CGame ca = { 0 }, cb = { 0 };
+    ca.g = &a;
+    cb.g = &b;
     for (int i = 0; i < 3000; i++) {
         uint16_t t;
         if (cgame_frame(&ca, &t) != FRAME_DONE || cgame_frame(&cb, &t) != FRAME_DONE) {

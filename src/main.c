@@ -307,9 +307,9 @@ static int c_start_assets(void)
     memcpy(g.cmos_saved, g.cg.cmos, sizeof g.cmos_saved);
     g.cg.rom = g.rom_flat;
     g.cg.on_sound = c_sound;
-    cgame_power_on(&g.cg);
     g.cgd.g = &g.cg;
     g.cgd.picture = c_picture;
+    cgame_start(&g.cgd);
     for (int c = 0; c < EXTRACT_SOUND_COMMANDS; c++) g.sound_ids[c] = -1;
     g.c_assets = 1;
     g.c_ready = 1;
@@ -334,9 +334,9 @@ static void c_start(void)
     g.cg.on_sound = c_sound;
     memcpy(g.cg.cmos, g.board.cmos, sizeof g.cg.cmos);
     memcpy(g.cmos_saved, g.board.cmos, sizeof g.cmos_saved);
-    cgame_power_on(&g.cg);
     g.cgd.g = &g.cg;
     g.cgd.picture = c_picture;
+    cgame_start(&g.cgd);
     g.c_base = g.board.frame;
     g.c_ready = 1;
 }
