@@ -37,4 +37,9 @@ StepResult spawn_choose(Game *g, uint16_t u, uint16_t table);
 /* $8B40-$8B78: the first free pad from `first` (0-3, round to 3 twice) */
 StepResult spawn_from(Game *g, uint16_t u, int first);
 
+/* $65EE: a fixed picture's draw node (chain +6) from the template at
+   tmpl (+2 the data, +4 the screen address, +6-7 width and height);
+   returns the node */
+uint16_t spawn_pad_draw(Game *g, uint16_t tmpl);
+
 #endif

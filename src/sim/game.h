@@ -28,6 +28,9 @@ typedef struct {
     uint8_t pia0_crb;   /* $C807 */
     int mux;            /* CB2 as $C807 last set it */
     uint8_t cmos[1024]; /* $CC00-$CFFF: nibbles, | $F0 as the board keeps them */
+    /* the CPU's Y as a task step starts: what the step before left; one
+       step reads it ($81C4, a platform's burn), the tests copy the board's */
+    uint16_t y;
     /* optional, for tests: called before each RAM write the C game makes,
        and on each RAM read */
     void (*on_write)(void *user, uint16_t addr);

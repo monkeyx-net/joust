@@ -227,6 +227,7 @@ static void start_step(uint16_t task)
     model.in0 = board.in0; /* the controls change between frames: as the PIA shows them now */
     model.inp1 = board.inp1;
     model.inp2 = board.inp2;
+    model.y = board.cpu.y;
     before = model;
     irq_count = irq_n = 0;
     step_writes = 0;

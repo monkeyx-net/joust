@@ -64,7 +64,7 @@ static void pads_busy(Game *g, uint16_t zones)
 }
 
 /* $65EE: a fixed picture from its node template, on chain +6 */
-static uint16_t pad_draw(Game *g, uint16_t tmpl)
+uint16_t spawn_pad_draw(Game *g, uint16_t tmpl)
 {
     uint8_t line = (uint8_t)((game_read(g, (uint16_t)(tmpl + 7)) ^ 4) + game_read(g, (uint16_t)(tmpl + 5)));
     uint16_t node = display_node(g, 1, line);
@@ -83,7 +83,7 @@ static uint16_t pad_template(const Game *g, uint16_t u)
 /* $8BAF: the pad in the rider's colour, the rider growing in; then $8C17's frame */
 static StepResult grow(Game *g, uint16_t u)
 {
-    uint16_t node = pad_draw(g, pad_template(g, u));
+    uint16_t node = spawn_pad_draw(g, pad_template(g, u));
     uint8_t colour = game_read(g, table(g, u, 0x2E));
     game_poke(g, node, game_peek(g, node) | 0x10);
     game_poke(g, (uint16_t)(node + 1), colour);
@@ -186,7 +186,7 @@ static StepResult leave(Game *g, uint16_t u)
     rider_pictures(g, u, 0);
     uint16_t pad = game_word(g, F(u, 0x20)), count = game_read_word(g, (uint16_t)(pad + 6));
     game_poke(g, count, (uint8_t)(game_peek(g, count) - 1));
-    pad_draw(g, pad_template(g, u));
+    spawn_pad_draw(g, pad_template(g, u));
     if (on(g, u)) return STEP_UNPORTED;
     /* $8CF1 */
     game_set_word(g, F(u, 0x1A), game_read_word(g, game_read_word(g, table(g, u, 0x0A))));
@@ -221,7 +221,7 @@ static StepResult wait(Game *g, uint16_t u)
         if (!left) return leave(g, u);
     }
     rider_pictures(g, u, 1);
-    uint16_t node = pad_draw(g, pad_template(g, u));
+    uint16_t node = spawn_pad_draw(g, pad_template(g, u));
     uint16_t colours = game_read_word(g, table(g, u, 0xC)), x = (uint16_t)(node - 0x14);
     uint8_t b = game_peek(g, F(u, 0x26));
     b = (uint8_t)(shimmer(g, u, &x, colours, b) - 1);

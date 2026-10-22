@@ -4,6 +4,7 @@
 
 #include "gfx/williams.h"
 
+#include "sim/burn.h"
 #include "sim/checksum.h"
 #include "sim/collide.h"
 #include "sim/death.h"
@@ -181,7 +182,7 @@ void game_sound(Game *g, uint16_t script)
 int game_step_ported(const Game *g, uint16_t task)
 {
     uint16_t at = game_word(g, (uint16_t)(task + TASK_RESUME));
-    return checksum_ported(at) || lava_ported(at) || collide_ported(at) || scores_ported(at) || flow_ported(at) || rider_ported(at) || wave_ported(at) || eggs_ported(at) || spawn_ported(at) || ptero_ported(at) || points_ported(at) || death_ported(at) || waves_ported(at);
+    return checksum_ported(at) || lava_ported(at) || collide_ported(at) || scores_ported(at) || flow_ported(at) || rider_ported(at) || wave_ported(at) || eggs_ported(at) || spawn_ported(at) || ptero_ported(at) || points_ported(at) || death_ported(at) || waves_ported(at) || burn_ported(at);
 }
 
 StepResult game_step(Game *g, uint16_t task)
@@ -200,5 +201,6 @@ StepResult game_step(Game *g, uint16_t task)
     if (points_ported(at)) return points_step(g, task, at);
     if (death_ported(at)) return death_step(g, task, at);
     if (waves_ported(at)) return waves_step(g, task, at);
+    if (burn_ported(at)) return burn_step(g, task, at);
     return STEP_UNPORTED;
 }

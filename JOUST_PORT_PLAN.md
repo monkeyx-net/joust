@@ -381,6 +381,18 @@ named; `game` checks each (section 3).
   ($6DFE by +$1C, two easy waves; <$AD from $6DE2) and the manager. The
   ROM keeps return addresses across sleeps in +$F and +$11 (A and B in
   +$15); the C uses the same fields, and a stack within a step.
+- **Burning and the lava's fire** (`sim/burn.c`): $81A0 (a platform
+  burning away: its picture flashed five times, $2A every other 10
+  frames; an erase node, $8240, whose line comes from the CPU's Y as the
+  step starts, left by the step before: the one register the C model
+  keeps, `Game.y`; then five pixel frames from $ED19 into video RAM 8
+  frames apart, at the template's address or $F145/$3151 for the two
+  whose templates are [$0000]/[$0004], and the erase again); $8638 (a
+  lava bridge: when the lava, <$9D, is up to $DF, column by column from
+  +$2B its top map's bit 5 set to the template's at $EBB8 + x, a flame,
+  [$002C]'s frames, beside it every 6 frames, until a bit was already
+  right; then the flame sinks to $EF and <$4B gets bit 7); $86D0 (the
+  lava's side flames, a frame every 6, rising to $DF).
 - **The spawn** (`sim/spawn.c`, $87B0-$883D, $8B2D-$8D22): four pads, the
   records at $8A5D-$8A75 (8 bytes: [a word holding the pad's node
   template's address][x][line][its use count, <$6E-<$71]). $87B0: the use
@@ -577,7 +589,8 @@ named; `game` checks each (section 3).
   body); the wave task from a wave's end to the next wave's manager
   (400 cases on every record and ending, the settings' countdowns and
   the CMOS difficulty at random: about 100000 steps, 230 platform
-  changes, 1000 eggs); $83D8 takes the pterodactyl's table too (60 killed); a
+  changes, 1000 eggs); the burning platforms, bridges and flames step by
+  step to their end (300, the CPU's Y at random); $83D8 takes the pterodactyl's table too (60 killed); a
   riderless mount's brain (20000 near its knight or not: about 700 pick
   it up, 5600 hop); $77BE, points placed among two displays near them
   (20000: about 9900 wait).

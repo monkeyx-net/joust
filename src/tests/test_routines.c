@@ -43,6 +43,8 @@
  *   - the wave task (sim/waves.c) from a wave's end through the next
  *     wave's start, step by step, on every wave record and ending, the
  *     settings' countdowns and the CMOS difficulty at random
+ *   - the burning platforms, lava bridges and flames (sim/burn.c), step
+ *     by step to their end (the CPU's Y at random as each step starts)
  *   - the pterodactyl's task step by step (to the sleep, $E15F) from a
  *     random flight or its death ($6828), through the body's pixels, to
  *     the points; all of RAM after each step
@@ -698,6 +700,82 @@ static void waves_cases(void)
            CASES / 50, steps, done, platforms, eggs);
 }
 
+/* Step the task at TASK_U (on the list after TASK_X) from its resume
+   address until it ends or `stop` resumes, at most n steps, against the C
+   step; the CPU's Y as each step starts is random (as the step before
+   would leave it). Returns the steps that matched, -1 on a difference. */
+static long task_steps(const char *what, int i, int n, uint16_t stop)
+{
+    long steps = 0;
+    for (int k = 0; k < n; k++) {
+        uint16_t at = (uint16_t)(board.ram[TASK_U + 5] << 8 | board.ram[TASK_U + 6]);
+        if (k && at == stop) break;
+        poke_word(TASK_X, TASK_U);
+        poke_word(0xA02C, TASK_X);
+        poke_word(0xA02E, TASK_U);
+        poke_word(0xA02A, 0xAA00);
+        sync_model();
+        board.cpu.u = TASK_U;
+        do board.cpu.y = (uint16_t)rnd(); /* not reading I/O, which the model does not have */
+        while (board.cpu.y >= 0xBFF8 && board.cpu.y < 0xD000);
+        model.y = board.cpu.y;
+        uint16_t free_before = (uint16_t)(board.ram[0xA008] << 8 | board.ram[0xA009]);
+        uint16_t end = call(at, 0xE15F);
+        StepResult r = game_step(&model, TASK_U);
+        if (end != 0xE15F || r != STEP_DONE) {
+            if (failures++ < 8)
+                fprintf(stderr, "test_routines: %s case %d at $%04X: ROM %s, C %s\n", what, i, at,
+                        end == 0xE15F ? "slept" : "did not sleep", r == STEP_DONE ? "slept" : "not ported");
+            return -1;
+        }
+        steps++;
+        long d = first_difference();
+        if (d >= 0) {
+            if (failures++ < 8)
+                fprintf(stderr, "test_routines: %s case %d at $%04X: $%04lX = %02X, C %02X\n", what, i, at, d,
+                        board.ram[d], model.ram[d]);
+            return -1;
+        }
+        if ((uint16_t)(board.ram[0xA008] << 8 | board.ram[0xA009]) != free_before) break; /* it ended */
+    }
+    return steps;
+}
+
+/* the burning platforms, the lava bridges and flames (sim/burn.c) */
+static void burn_cases(void)
+{
+    static const uint16_t platforms[] = { 0x6FCB, 0x6FD2, 0x6FD9, 0x6FE0 };
+    long steps = 0;
+    for (int i = 0; i < 300; i++) {
+        memcpy(board.ram, base, sizeof base);
+        for (int k = 7; k < 0x38; k++) board.ram[TASK_U + k] = (uint8_t)rnd();
+        int kind = i % 3;
+        if (kind == 0) {
+            poke_word(TASK_U + 5, 0x81A0);
+            uint16_t r = platforms[rnd() % 4];
+            poke_word(TASK_U + 0xE, (uint16_t)(data[data[r + 3] << 8 | data[r + 4]] << 8 |
+                                               data[(data[r + 3] << 8 | data[r + 4]) + 1]));
+        } else if (kind == 1) {
+            poke_word(TASK_U + 5, 0x8638);
+            int left = rnd() % 2;
+            poke_word(TASK_U + 0x2B, left ? 0xFFE0 : 0x013F);
+            board.ram[TASK_U + 0x14] = left ? 1 : 7;
+            board.ram[TASK_U + 0x2D] = left ? 1 : 0xFF;
+            poke_word(TASK_U + 0xA, 0x00DF);
+            board.ram[TASK_U + 0x10] = 0;
+            board.ram[0xA09D] = (uint8_t)(0xD8 + rnd() % 0x10);
+        } else {
+            poke_word(TASK_U + 5, 0x86D0);
+            poke_word(TASK_U + 0xA, 0x00EF);
+            poke_word(TASK_U + 7, rnd() % 2 ? 0x0014 : 0x0106);
+            board.ram[TASK_U + 0x10] = (uint8_t)(rnd() % 4);
+        }
+        long n = task_steps("burn", i, 400, 0);
+        if (n > 0) steps += n;
+    }
+    printf("test_routines: burning platforms, lava bridges and flames: 300 cases, %ld steps\n", steps);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -731,6 +809,7 @@ int main(int argc, char **argv)
     mount_cases();
     points_cases();
     waves_cases();
+    burn_cases();
     if (failures) {
         fprintf(stderr, "test_routines: %d differences\n", failures);
         return 1;
