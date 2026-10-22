@@ -63,3 +63,19 @@ void score_add(Game *g, uint16_t x, uint8_t a, int nibbles)
         game_audit(g, 5);
     }
 }
+
+int score_life_used(Game *g, uint16_t x)
+{
+    uint16_t s = game_read_word(g, (uint16_t)(x + 4));
+    if (!s) return 0;
+    uint8_t a = game_peek(g, (uint16_t)(s + 5));
+    if (!a) return 0;
+    if (game_peek(g, 0xA090) & 0x80) game_audit(g, 7);
+    a = (uint8_t)(a - 1);
+    game_poke(g, (uint16_t)(s + 5), a);
+    if (a <= 4) { /* its icon erased */
+        uint16_t dst = (uint16_t)(((uint8_t)((uint8_t)(a << 1) + a) << 8) + game_read_word(g, (uint16_t)(x + 6)));
+        game_blit(g, 0x1A, 0xEE, game_read_word(g, (uint16_t)(x + 8)), dst, 0x07, 0x03);
+    }
+    return 1;
+}

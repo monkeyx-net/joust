@@ -1,6 +1,7 @@
 #include "sim/text.h"
 
 #define FONT_LARGE 0x4BC6
+#define FONT_SMALL 0x4B5C
 #define MESSAGES 0x531F
 
 /* $4A8E: character c from the font at `font` */
@@ -12,9 +13,9 @@ static uint16_t character(Game *g, uint16_t font, uint8_t c, uint8_t colour, uin
     return (uint16_t)(x + (w << 8));
 }
 
-uint16_t text_message(Game *g, uint8_t msg, uint8_t colour, uint16_t x)
+static uint16_t message(Game *g, uint16_t font, uint8_t msg, uint8_t colour, uint16_t x)
 {
-    game_set_word(g, 0xA0D1, FONT_LARGE);
+    game_set_word(g, 0xA0D1, font);
     uint16_t u = game_read_word(g, (uint16_t)(MESSAGES + 2 * (int8_t)msg));
     uint8_t c;
     do {
@@ -22,4 +23,11 @@ uint16_t text_message(Game *g, uint8_t msg, uint8_t colour, uint16_t x)
         x = character(g, game_word(g, 0xA0D1), c, colour, x);
     } while (!(c & 0x80));
     return x;
+}
+
+uint16_t text_message(Game *g, uint8_t msg, uint8_t colour, uint16_t x) { return message(g, FONT_LARGE, msg, colour, x); }
+
+uint16_t text_message_small(Game *g, uint8_t msg, uint8_t colour, uint16_t x)
+{
+    return message(g, FONT_SMALL, msg, colour, x);
 }

@@ -5,6 +5,7 @@
 #include "sim/brains.h"
 #include "sim/display.h"
 #include "sim/platform.h"
+#include "sim/score.h"
 #include "sim/tasks.h"
 
 #define CONTROLS 0xA032 /* <$32: the direction (-1, 0, 1), <$33 the flap */
@@ -25,7 +26,8 @@
 
 int rider_ported(uint16_t at)
 {
-    return at == RIDER_FLAPPING || at == RIDER_GLIDING || at == RIDER_STANDING || at == RIDER_AIRBORNE;
+    return at == RIDER_FLAPPING || at == RIDER_GLIDING || at == RIDER_STANDING || at == RIDER_AIRBORNE ||
+           at == AWAY_GONE;
 }
 
 static uint16_t field(uint16_t u, int off) { return (uint16_t)(u + off); }
@@ -145,19 +147,24 @@ int rider_brain(Game *g, uint16_t u, StepResult *slept)
     }
     int r = brain_enemy(g, u, b);
     if (r < 0) return BRAIN_UNPORTED;
-    if (r) { /* $8D40: it has its knight: standing where it is */
-        uint16_t t = game_word(g, field(u, 0xD));
-        game_set_word(g, field(u, 0x1A), game_read_word(g, game_read_word(g, (uint16_t)(t + 0x0A)))); /* $8CF1 */
-        game_set_word(g, field(u, 0x20), 0xDCE6);
-        game_set_word(g, field(u, 0x11), 0);
-        static const int cleared[] = { 0x14, 0x16, 0x10, 0x13, 0x15, 0x22, 0x23 };
-        for (size_t i = 0; i < sizeof cleared / sizeof cleared[0]; i++) game_poke(g, field(u, cleared[i]), 0);
-        game_poke(g, field(u, 2), game_peek(g, field(u, 2)) | 0x80);
-        game_poke(g, field(u, 0x17), 0x0C);
-        *slept = standing(g, u);
+    if (r) { /* it has its knight: standing where it is */
+        *slept = rider_stand_up(g, u);
         return BRAIN_SLEPT;
     }
     return BRAIN_SET;
+}
+
+StepResult rider_stand_up(Game *g, uint16_t u)
+{
+    uint16_t t = game_word(g, field(u, 0xD));
+    game_set_word(g, field(u, 0x1A), game_read_word(g, game_read_word(g, (uint16_t)(t + 0x0A)))); /* $8CF1 */
+    game_set_word(g, field(u, 0x20), 0xDCE6);
+    game_set_word(g, field(u, 0x11), 0);
+    static const int cleared[] = { 0x14, 0x16, 0x10, 0x13, 0x15, 0x22, 0x23 };
+    for (size_t i = 0; i < sizeof cleared / sizeof cleared[0]; i++) game_poke(g, field(u, cleared[i]), 0);
+    game_poke(g, field(u, 2), game_peek(g, field(u, 2)) | 0x80);
+    game_poke(g, field(u, 0x17), 0x0C);
+    return standing(g, u);
 }
 
 /* $D83D: the brain, the facing, frames since a flap, the erase nodes; as brain() */
@@ -487,6 +494,16 @@ StepResult rider_step(Game *g, uint16_t u, uint16_t at)
 {
     if (at == RIDER_STANDING) return ground(g, u);
     if (at == RIDER_AIRBORNE) return airborne(g, u);
+    if (at == AWAY_GONE) { /* off the screen: the table's +$E routine */
+        game_set_word(g, field(u, 7), 0x0096);
+        uint16_t then = table(g, u, 0x0E);
+        if (then == 0x8AA7) return task_end(g);
+        if (then != 0x8AAA) return STEP_UNPORTED;
+        if (!score_life_used(g, game_word(g, field(u, 0xD)))) return task_end(g); /* $8AAA: a player's next life */
+        game_poke(g, field(u, 0x16), game_peek(g, 0xA038));
+        game_poke(g, 0xA038, (uint8_t)(game_peek(g, 0xA038) + 1));
+        return task_sleep(g, 1, 0x8B1A);
+    }
     if (game_word(g, field(u, 0x30)) != FLYING) return STEP_UNPORTED;
     StepResult slept = STEP_DONE;
     int r = think(g, u, &slept);

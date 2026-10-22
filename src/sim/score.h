@@ -21,4 +21,9 @@ void score_add(Game *g, uint16_t x, uint8_t a, int nibbles);
 /* $8719: a life for the rider whose table is at x */
 void score_life(Game *g, uint16_t x);
 
+/* $8750: a life used by the rider whose table is at x (+5 down, counted
+   in audit 7 in a game, the icon erased while it is the fifth or fewer):
+   0 none left (or no score block) */
+int score_life_used(Game *g, uint16_t x);
+
 #endif

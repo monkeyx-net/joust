@@ -4,12 +4,19 @@
 
 #include "sim/display.h"
 #include "sim/rider.h"
+#include "sim/score.h"
 #include "sim/tasks.h"
 
 #define PADS 0x8A5D
 #define TURN_WAIT 0x8B1A
 
-int spawn_ported(uint16_t at) { return at == SPAWN_GROW || at == SPAWN_WAIT; }
+#define SPAWN_START 0x8D23
+#define SPAWN_START_ON 0x8D2D
+
+int spawn_ported(uint16_t at)
+{
+    return at == SPAWN_GROW || at == SPAWN_WAIT || at == SPAWN_START || at == SPAWN_START_ON;
+}
 
 static uint16_t F(uint16_t u, int off) { return (uint16_t)(u + off); }
 static uint16_t table(const Game *g, uint16_t u, int off) { return (uint16_t)(game_word(g, F(u, 0xD)) + off); }
@@ -111,7 +118,11 @@ StepResult spawn_choose(Game *g, uint16_t u, uint16_t zones)
     pads_busy(g, zones);
     int carry;
     uint8_t r = game_random(g, &carry);
-    int first = carry ? (r & 1 ? 3 : 2) : (r & 1 ? 1 : 0);
+    return spawn_from(g, u, carry ? (r & 1 ? 3 : 2) : (r & 1 ? 1 : 0));
+}
+
+StepResult spawn_from(Game *g, uint16_t u, int first)
+{
     uint16_t pad = 0;
     for (int k = 0; k < 8 && !pad; k++) {
         int p = (first + k) & 3;
@@ -152,13 +163,9 @@ static uint8_t shimmer(Game *g, uint16_t u, uint16_t *x, uint16_t colours, uint8
     return saved;
 }
 
-/* $8CD5: off the pad and onto the ground */
-static StepResult leave(Game *g, uint16_t u)
+/* the table's +$14 routine: -1 one not ported */
+static int on(Game *g, uint16_t u)
 {
-    rider_pictures(g, u, 0);
-    uint16_t pad = game_word(g, F(u, 0x20)), count = game_read_word(g, (uint16_t)(pad + 6));
-    game_poke(g, count, (uint8_t)(game_peek(g, count) - 1));
-    pad_draw(g, pad_template(g, u));
     uint16_t who = game_read_word(g, table(g, u, 0x14));
     if (who == 0x8267) { /* a player: <$73 or <$75 */
         if (!game_word(g, 0xA073)) {
@@ -168,9 +175,19 @@ static StepResult leave(Game *g, uint16_t u)
             game_set_word(g, 0xA075, u);
             game_poke(g, 0xA0A9, game_peek(g, 0xA0A7));
         }
-    } else if (who != 0x8A7D) {
-        return STEP_UNPORTED;
+        return 0;
     }
+    return who == 0x8A7D ? 0 : -1;
+}
+
+/* $8CD5: off the pad and onto the ground */
+static StepResult leave(Game *g, uint16_t u)
+{
+    rider_pictures(g, u, 0);
+    uint16_t pad = game_word(g, F(u, 0x20)), count = game_read_word(g, (uint16_t)(pad + 6));
+    game_poke(g, count, (uint8_t)(game_peek(g, count) - 1));
+    pad_draw(g, pad_template(g, u));
+    if (on(g, u)) return STEP_UNPORTED;
     /* $8CF1 */
     game_set_word(g, F(u, 0x1A), game_read_word(g, game_read_word(g, table(g, u, 0x0A))));
     game_set_word(g, F(u, 0x20), 0xDCE6);
@@ -244,6 +261,16 @@ static StepResult grown(Game *g, uint16_t u)
 
 StepResult spawn_step(Game *g, uint16_t u, uint16_t at)
 {
+    if (at == SPAWN_START) { /* $8D23: on the bottom platform after a second */
+        game_set_word(g, F(u, 0xA), 0x00D2);
+        return task_sleep(g, 0x3C, SPAWN_START_ON);
+    }
+    if (at == SPAWN_START_ON) {
+        score_life_used(g, game_word(g, F(u, 0xD)));
+        if (on(g, u)) return STEP_UNPORTED;
+        game_set_word(g, F(u, 0x24), game_read_word(g, game_word(g, F(u, 0xD))));
+        return rider_stand_up(g, u);
+    }
     if (at == SPAWN_GROW) return grown(g, u);
     if (at == SPAWN_WAIT) return wait(g, u);
     return STEP_UNPORTED;

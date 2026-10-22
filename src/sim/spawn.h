@@ -34,5 +34,7 @@ int spawn_ported(uint16_t at);
 StepResult spawn_step(Game *g, uint16_t task, uint16_t at);
 /* $8B30: pick a pad (zones from `table`) and start appearing on it */
 StepResult spawn_choose(Game *g, uint16_t u, uint16_t table);
+/* $8B40-$8B78: the first free pad from `first` (0-3, round to 3 twice) */
+StepResult spawn_from(Game *g, uint16_t u, int first);
 
 #endif

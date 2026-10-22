@@ -16,4 +16,7 @@
    x (the column << 8 | the line), large font; returns x after it */
 uint16_t text_message(Game *g, uint8_t msg, uint8_t colour, uint16_t x);
 
+/* $4ABF (through $4A53): the same in the small font */
+uint16_t text_message_small(Game *g, uint8_t msg, uint8_t colour, uint16_t x);
+
 #endif

@@ -20,4 +20,12 @@
 /* $8279 (player2 0) / $827F: the player at u unhorsed by `winner` (0: none) */
 void death_player(Game *g, uint16_t u, uint16_t winner, int player2);
 
+/* The death's task ($8139-$8181: three pictures, [$002E], [$0030],
+   [$0032], for 5, 8 and 12 frames, x kept within 4-$120, then the
+   platform bits there to <$4B) and the other player's turn ($834B: its
+   message, [table+$30], and "UP" in the small font at $296C, every 8
+   frames for +$2D looks in a two-player game, then erased). */
+int death_ported(uint16_t at);
+StepResult death_step(Game *g, uint16_t task, uint16_t at);
+
 #endif

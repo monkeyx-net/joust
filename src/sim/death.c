@@ -1,6 +1,8 @@
 #include "sim/death.h"
 
+#include "sim/display.h"
 #include "sim/score.h"
+#include "sim/text.h"
 #include "sim/tasks.h"
 
 static uint16_t F(uint16_t t, int off) { return (uint16_t)(t + off); }
@@ -67,4 +69,67 @@ void death_player(Game *g, uint16_t u, uint16_t winner, int player2)
         return;
     }
     task_create(g, game_word(g, TASK_HEAD), 0x61F0, 0x34, 0x00); /* game over */
+}
+
+int death_ported(uint16_t at)
+{
+    return at == 0x8139 || at == 0x815B || at == 0x816E || at == 0x8181 || at == 0x834B || at == 0x8357;
+}
+
+/* $8E89 (chain 1) / $8E9F (chain 0): a node from the record at [ptr] */
+static void node(Game *g, uint16_t u, int chain, uint16_t ptr)
+{
+    display_fill(g, display_object(g, u, chain, 1), game_read_word(g, ptr));
+}
+
+/* $8368: the other player's turn: the player's message and "UP" ($6D) */
+static void turn(Game *g, uint16_t t, uint8_t colour)
+{
+    uint16_t x = text_message_small(g, game_read(g, F(t, 0x30)), colour, 0x296C);
+    text_message_small(g, 0x6D, colour, (uint16_t)(x + 0x300));
+}
+
+StepResult death_step(Game *g, uint16_t u, uint16_t at)
+{
+    switch (at) {
+    case 0x8139: { /* the death's pictures, kept on the screen */
+        int16_t x = (int16_t)game_word(g, F(u, 7));
+        if (x <= 4) x = 4;
+        if (x >= 0x120) x = 0x120;
+        game_set_word(g, F(u, 7), (uint16_t)x);
+        node(g, u, 1, 0x002E);
+        return task_sleep(g, 5, 0x815B);
+    }
+    case 0x815B:
+        node(g, u, 0, 0x002E);
+        node(g, u, 1, 0x0030);
+        return task_sleep(g, 8, 0x816E);
+    case 0x816E:
+        node(g, u, 0, 0x0030);
+        node(g, u, 1, 0x0032);
+        return task_sleep(g, 0x0C, 0x8181);
+    case 0x8181: {
+        node(g, u, 0, 0x0032);
+        uint16_t x = game_word(g, F(u, 7)), y = game_word(g, F(u, 0xA));
+        uint8_t a = (uint8_t)((game_read(g, (uint16_t)(y - 0x17D8)) | game_read(g, (uint16_t)(y - 0x17D6))) &
+                              game_read(g, (uint16_t)(x - 0x515E)));
+        game_poke(g, 0xA04B, a | game_peek(g, 0xA04B));
+        return task_end(g);
+    }
+    case 0x8357:
+        if (game_peek(g, 0xA090)) {
+            uint8_t n = (uint8_t)(game_peek(g, F(u, 0x2D)) - 1);
+            game_poke(g, F(u, 0x2D), n);
+            if (n) goto show;
+        }
+        turn(g, game_word(g, F(u, 0xD)), 0);
+        return task_end(g);
+    case 0x834B:
+    show: {
+        uint16_t t = game_word(g, F(u, 0xD));
+        turn(g, t, game_read(g, F(t, 0x2E)));
+        return task_sleep(g, 8, 0x8357);
+    }
+    }
+    return STEP_UNPORTED;
 }

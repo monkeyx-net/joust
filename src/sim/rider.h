@@ -45,6 +45,10 @@ uint16_t rider_pictures(Game *g, uint16_t u, int chain);
 int rider_brain(Game *g, uint16_t u, StepResult *slept);
 /* $8DF9: the standing box (13 lines) and the pictures for the frame */
 void rider_stand_box(Game *g, uint16_t u);
+/* $8D40: standing up where it is ($8CF1: its rider's frames, the run
+   animation's start, still, the type's bit 7; then the box, the draw
+   nodes and the rest) */
+StepResult rider_stand_up(Game *g, uint16_t u);
 /* $8D50: on the ground with the controls in <$32-<$33 */
 StepResult rider_ground_on(Game *g, uint16_t u);
 

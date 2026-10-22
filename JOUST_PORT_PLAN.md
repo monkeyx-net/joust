@@ -234,7 +234,23 @@ named; `game` checks each (section 3).
   free list is corrupted), the sound $EFB7, the player out of <$73-<$76,
   a life gone (+6); the last with <$90 set: the other player on ($834B,
   type 9) if <$52 | <$5C, else game over ($61F0, type $34, after the
-  list's first task). $753B (also $7535, types without bit 0 in
+  list's first task). The death's task: x kept within 4-$120, the
+  pictures at [$002E], [$0030], [$0032] for 5, 8 and 12 frames (each
+  erased as the next is drawn), then the platform bits there ($E828/$E82A
+  + line against $AEA2 + x) to <$4B. The other player's turn ($834B): its
+  message ([table+$30]) and "UP" ($6D) in the small font ($4ABF, at $296C
+  and 3 columns on) in the table's +$2E colour, every 8 frames for $16
+  looks with two players, then erased. A riderless mount off the screen
+  ($EF08): x $96, the table's +$E: $8AA7 ends an enemy's task; $8AAA a
+  player's next life ($8750: +5 of its score block down, audit 7 in a
+  game, the icon erased while it is the fifth or fewer; none left ends
+  the task), then its turn ($8B15). A player's turn ($8ABA): when <$39
+  comes round to its +$16, the riders (and eggs with a mount coming)
+  counted by thirds ($D800), the pads' use counts copied, and the pad in
+  the emptiest third ($8A75 the bottom's, $8A65/$8A6D the middle's, $8A5D
+  the top's) if free, else $8B30's random pick. $8D23 (a new game's
+  player): line $D2, after 60 frames a life used, the table's +$14 and
+  first brain, and standing ($8D40). $753B (also $7535, types without bit 0 in
   common): an egg collected (the sound $EF86, the collector's egg count,
   [+D]+$12, up to 4; points by it from $75A1: 250, 500, 750, 1000, plus
   500 caught in the air; one enemy fewer, <$AA; its waiting mount sent
