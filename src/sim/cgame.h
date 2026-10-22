@@ -23,6 +23,12 @@ typedef struct {
     int advance; /* the advance switch was pressed (the test mode: not ported) */
 } CGame;
 
+/* $E03D-$E0E0: the state at the frame loop's first start after a reset
+   (RAM cleared to $BF7F, the ROM selected, PIA 0's multiplexer, the
+   switches' debounce, the task blocks linked, the display lists, the
+   palette from $E5FA, the minute's count, the credits from the CMOS's
+   copy, the first task $5ED0). The CMOS (g->cmos) as it is. */
+void cgame_power_on(Game *g);
 /* One frame; FRAME_UNPORTED if a step was not ported (*task the task). */
 FrameResult cgame_frame(CGame *c, uint16_t *task);
 

@@ -12,7 +12,9 @@
  * board's at its next $E0E2. An interrupt inside a ROM step is given to
  * the C game after that step: frames where that matters (the random
  * stir inside a random step) differ; they are counted, the C game is
- * loaded again and goes on. At least 97% of the frames must match.
+ * loaded again and goes on. At least 97% of the frames must match. Also
+ * the power-on ($E03D, cgame_power_on) against the board's RAM as it
+ * first enables interrupts ($E0E0).
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +22,7 @@
 
 #include "assets/rom.h"
 #include "emu/board.h"
+#include "sim/cgame.h"
 #include "sim/frame.h"
 #include "sim/game.h"
 #include "sim/irq.h"
@@ -37,6 +40,7 @@
 #define STACK_TO 0xBF00
 
 static RomSet rom;
+static int failures;
 static Board board;
 static uint8_t data[0x10000];
 static Game model;
@@ -195,7 +199,7 @@ static void controls(long f)
 }
 
 static long frames, matched, run, longest, mismatched, unported_frames, dispatch_mismatches;
-static int failures, start_frame, loaded;
+static int start_frame, loaded;
 static long board_frame;
 
 /* the C frame for the loop frame just recorded, then the comparison */
@@ -259,9 +263,39 @@ static void c_frame(void)
     }
 }
 
+static int powered;
+
+/* the board's state as it enables interrupts ($E0E0) after the reset,
+   against cgame_power_on */
+static void power_on_check(void)
+{
+    static Game p;
+    memset(&p, 0, sizeof p);
+    p.rom = data;
+    memcpy(p.cmos, board.cmos, sizeof p.cmos);
+    cgame_power_on(&p);
+    long d = -1;
+    for (unsigned a = 0; a < 0xBF80 && d < 0; a++)
+        if ((a < STACK_FROM || a >= STACK_TO) && p.ram[a] != board.ram[a]) d = a;
+    if (d >= 0) {
+        fprintf(stderr, "test_frame: the power-on: $%04lX = %02X, C %02X\n", d, board.ram[d], p.ram[d]);
+        failures++;
+    } else if ((p.romsel & 1) != (board.romsel & 1) || p.ram[0xBFFF] != board.ram[0xBFFF] || p.mux != board.mux_select ||
+               memcmp(p.cmos, board.cmos, sizeof p.cmos)) {
+        fprintf(stderr, "test_frame: the power-on: the ROM select, $BFFF, the multiplexer or the CMOS differ\n");
+        failures++;
+    } else {
+        printf("test_frame: the power-on ($E03D) in C equals the board's RAM as it enables interrupts\n");
+    }
+}
+
 static void loop_hook(Board *b)
 {
     if ((b->cpu.irq && !(b->cpu.cc & CC_I)) || (b->cpu.firq && !(b->cpu.cc & CC_F))) return;
+    if (b->cpu.pc == 0xE0E0 && !powered) { /* (ANDCC: before the first interrupt) */
+        powered = 1;
+        power_on_check();
+    }
     if (b->cpu.pc == LOOP && board_frame >= start_frame) {
         if (loaded) c_frame();
         else {

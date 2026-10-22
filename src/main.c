@@ -237,20 +237,8 @@ static void c_picture(void *user, const Game *cg)
     williams_draw_vram(&fb, cg->ram, cg->palette);
 }
 
-/* The C game takes the board's state at its frame loop's first start
-   ($E0E2), after the power-on; from then on the board runs only its sound. */
-static void c_load_hook(Board *b)
-{
-    if (g.c_ready || b->cpu.pc != 0xE0E2) return;
-    game_load(&g.cg, b->ram, b->romsel);
-    memcpy(g.cg.cmos, b->cmos, sizeof g.cg.cmos);
-    memcpy(g.cmos_saved, b->cmos, sizeof g.cmos_saved);
-    g.cg.pia0_crb = b->pia[0].b.cr;
-    g.cg.mux = b->mux_select;
-    for (int i = 0; i < 16; i++) g.cg.palette[i] = b->palette[i];
-    g.c_ready = 1;
-}
-
+/* The C game from the reset ($E03D, sim/cgame.c) with the board's CMOS
+   (primed on a first start); the board then only runs its sound. */
 static void c_start(void)
 {
     for (unsigned a = 0; a < 0x10000; a++) {
@@ -259,12 +247,13 @@ static void c_start(void)
     }
     g.cg.rom = g.rom_flat;
     g.cg.on_sound = c_sound;
-    g.board.step_hook = c_load_hook;
-    while (!g.c_ready) board_run_frame(&g.board, NULL);
-    g.board.step_hook = NULL;
+    memcpy(g.cg.cmos, g.board.cmos, sizeof g.cg.cmos);
+    memcpy(g.cmos_saved, g.board.cmos, sizeof g.cmos_saved);
+    cgame_power_on(&g.cg);
     g.cgd.g = &g.cg;
     g.cgd.picture = c_picture;
     g.c_base = g.board.frame;
+    g.c_ready = 1;
 }
 
 /* A frame of the C game, then a frame of the sound board's. */

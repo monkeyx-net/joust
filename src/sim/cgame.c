@@ -1,6 +1,7 @@
 #include "sim/cgame.h"
 
 #include "sim/irq.h"
+#include "sim/tasks.h"
 
 #include <stddef.h>
 
@@ -32,4 +33,28 @@ FrameResult cgame_frame(CGame *c, uint16_t *task)
     FrameHooks h = { c, interrupts, NULL };
     c->g->beam = NULL;
     return frame_run(c->g, &h, task);
+}
+
+void cgame_power_on(Game *g)
+{
+    for (uint16_t a = 0; a < 0xBF80; a++) game_poke(g, a, 0);
+    game_select_rom(g, 1);
+    game_poke(g, 0xC807, 0x00); /* PIA 0: the controls, the multiplexer (CB2) high */
+    game_poke(g, 0xC807, 0x34);
+    game_poke(g, 0xA08B, 0x3C);
+    game_poke(g, 0xA0B4, 0x3C);
+    game_set_word(g, TASK_FREE, TASK_FIRST); /* the blocks linked, the last to $A9C0 */
+    for (uint16_t u = TASK_FIRST; u < 0xA9C0; u = (uint16_t)(u + TASK_SIZE)) game_set_word(g, u, (uint16_t)(u + TASK_SIZE));
+    game_set_word(g, 0xA025, 0xA9C0);
+    game_set_word(g, 0xA068, 0xAC21);
+    for (int i = 0; i < 16; i++) game_poke(g, (uint16_t)(0xA00F + i), game_read(g, (uint16_t)(0xE5FA + i)));
+    game_set_word(g, 0xA099, 0x0E10);
+    uint8_t b = game_cmos_byte(g, 0xCD00); /* the credits, if the CMOS's copy is sane */
+    if (b > 0x20 || (b & 0x0F) > 9) {
+        b = 0;
+        game_poke(g, 0xCD01, b);
+        game_poke(g, 0xCD00, (uint8_t)(b >> 4));
+    }
+    game_poke(g, 0xA0F2, b);
+    task_create(g, TASK_HEAD, 0x5ED0, 0x00, 0x00);
 }

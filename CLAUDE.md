@@ -66,8 +66,8 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
 ## Layout (`src/`)
 
 - `main.c` - SDL setup, fixed 60 Hz loop running one board frame per tick
-  (or with `--c-game` one frame of the C game, sim/cgame.c, taken over from
-  the board at its frame loop's first start, the board then only sounding),
+  (or with `--c-game` one frame of the C game, sim/cgame.c, from its own
+  power-on, the board then only sounding),
   the graphics pipeline, CMOS saving, the controls page over the attract
   mode (after 30 s idle; `$A09F` = 2 tells a game from the attract mode),
   the test card (`--test-card`),
