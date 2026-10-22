@@ -188,7 +188,8 @@ ctest --test-dir build -L mame      # needs MAME 0.289 and the ROM set
 `.github/workflows/build.yml` runs on every push and pull request to `main`,
 and by hand (Actions > Build > Run workflow):
 
-1. **Version:** reads `project(joust VERSION x.y.z)` from `CMakeLists.txt`.
+1. **Version:** reads the top `### vx.y.z` heading of `CHANGELOG.md` and
+   fails unless `project(joust VERSION x.y.z)` in `CMakeLists.txt` agrees.
    On a push, if the release `vx.y.z` already exists, the builds are skipped.
 2. **Linux x86_64 and aarch64:** in an Ubuntu 20.04 container (GCC 9,
    SDL 2.0.10, glibc 2.31 for PortMaster) on GitHub's x86_64 and arm64
@@ -204,7 +205,8 @@ and by hand (Actions > Build > Run workflow):
    notes.
 
 Every job uploads its archives as workflow artifacts. To publish a release,
-bump the version in `CMakeLists.txt` and push to `main`.
+add a `### vx.y.z (date)` section at the top of `CHANGELOG.md`, bump the
+version in `CMakeLists.txt` to match and push to `main`.
 
 ## License
 
