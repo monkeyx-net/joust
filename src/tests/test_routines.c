@@ -962,6 +962,8 @@ static void checksum_cases(void)
         poke_word(TASK_U + 5, 0xED03);
         poke_word(TASK_U + 0xD, 0x7FFE);
         board.ram[TASK_U + 0xF] = (uint8_t)rnd();
+        board.ram[0xA00D] = (uint8_t)rnd(); /* the random generator's state */
+        board.ram[0xA00E] = (uint8_t)rnd();
         poke_word(TASK_X, TASK_U);
         wrong += (uint8_t)(data[0x7FFE] + board.ram[TASK_U + 0xF]) != data[0xEEC1];
         if (one_step("ROM check", i, TASK_U, TASK_X)) return;
