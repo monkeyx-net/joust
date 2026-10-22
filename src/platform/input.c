@@ -71,6 +71,7 @@ void input_poll(InputFrame *out)
     InputFrame in = {0};
     const Uint8 *k = SDL_GetKeyboardState(NULL);
     in.p[0].move_x = k[SDL_SCANCODE_RIGHT] - k[SDL_SCANCODE_LEFT];
+    in.p[0].move_y = k[SDL_SCANCODE_DOWN] - k[SDL_SCANCODE_UP];
     in.p[0].flap = k[SDL_SCANCODE_SPACE] || k[SDL_SCANCODE_LCTRL] || k[SDL_SCANCODE_RCTRL];
     in.p[1].move_x = k[SDL_SCANCODE_D] - k[SDL_SCANCODE_A];
     in.p[1].flap = k[SDL_SCANCODE_W];
@@ -88,6 +89,10 @@ void input_poll(InputFrame *out)
                + SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)
                - SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
         if (mx) p->move_x = mx;
+        int my = axis_dir(SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_LEFTY))
+               + SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_DOWN)
+               - SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_UP);
+        if (my) p->move_y = my;
         p->flap |= SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_A) ||
                    SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_B) ||
                    SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_X) ||
@@ -97,7 +102,10 @@ void input_poll(InputFrame *out)
         r1_held |= SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
         l1_held |= SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
     }
-    for (int i = 0; i < PLAYERS; i++) in.p[i].move_x = clamp1(in.p[i].move_x);
+    for (int i = 0; i < PLAYERS; i++) {
+        in.p[i].move_x = clamp1(in.p[i].move_x);
+        in.p[i].move_y = clamp1(in.p[i].move_y);
+    }
 
     /* Select+Start held 1 s quits; until then neither counts as coin/start. */
     if (select_held && start_held) {

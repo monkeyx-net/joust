@@ -6,6 +6,7 @@
  *
  *            pad                          keyboard (P1 / P2)
  *   move     left stick, D-pad            Left Right / A D
+ *   up/down  left stick, D-pad            Up Down / -  (the adjustments)
  *   flap     A, B, X or Y                 Space or Ctrl / W
  *   coin     Select                       5
  *   start    Start (1P), L1+Start (2P)    1 or Enter / 2
@@ -24,6 +25,7 @@
 
 typedef struct {
     int move_x;          /* -1, 0, 1 */
+    int move_y;          /* -1 up, 0, 1 down: only the operator's pages use it */
     bool flap;
 } PlayerInput;
 

@@ -37,6 +37,11 @@ Two players at once. The first pad is player 1, the second player 2.
 | CRT scanlines on / off | | F5 |
 | Quit | hold Select + Start for 1 s | Esc |
 
+In the operator menu's adjustments page, as on the cabinet, player 1's
+stick picks an adjustment and player 2's changes it (keyboard A D); with
+one pad, up / down on player 1's stick or D-pad (keyboard Up Down) change
+it too. Advance (Select + R1 / F2) moves on.
+
 In the attract mode, after 30 seconds without input, a page lists these
 controls (for 10 seconds, every 40 seconds; any input hides it).
 

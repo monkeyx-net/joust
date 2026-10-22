@@ -351,9 +351,13 @@ static void c_start(void)
 static void c_step(const InputFrame *in)
 {
     Game *cg = &g.cg;
+    /* The adjustments change a value with player 2's stick: in the system
+       program player 1's up and down stand in for it (one pad is enough). */
+    int move2 = in->p[1].move_x;
+    if (g.cgd.operating && !move2) move2 = -in->p[0].move_y;
     cg->inp1 = (uint8_t)((in->p[0].move_x < 0 ? INP_LEFT : 0) | (in->p[0].move_x > 0 ? INP_RIGHT : 0) |
                          (in->p[0].flap ? INP_FLAP : 0));
-    cg->inp2 = (uint8_t)((in->p[1].move_x < 0 ? INP_LEFT : 0) | (in->p[1].move_x > 0 ? INP_RIGHT : 0) |
+    cg->inp2 = (uint8_t)((move2 < 0 ? INP_LEFT : 0) | (move2 > 0 ? INP_RIGHT : 0) |
                          (in->p[1].flap ? INP_FLAP : 0));
     cg->in0 = (uint8_t)((in->start ? IN0_START1 : 0) | (in->start2 ? IN0_START2 : 0));
     cg->in2 = (uint8_t)((in->coin ? IN2_COIN1 : 0) | (in->menu_held ? IN2_ADVANCE : 0));
@@ -646,6 +650,8 @@ static int load_script(const char *path)
             else if (!strcmp(tok, "left")) l->in.p[0].move_x = -1;
             else if (!strcmp(tok, "right")) l->in.p[0].move_x = 1;
             else if (!strcmp(tok, "flap")) l->in.p[0].flap = true;
+            else if (!strcmp(tok, "up")) l->in.p[0].move_y = -1;
+            else if (!strcmp(tok, "down")) l->in.p[0].move_y = 1;
             else if (!strcmp(tok, "left2")) l->in.p[1].move_x = -1;
             else if (!strcmp(tok, "right2")) l->in.p[1].move_x = 1;
             else if (!strcmp(tok, "flap2")) l->in.p[1].flap = true;

@@ -34,6 +34,8 @@ Controls (player 1 / player 2)
   Graphics: Select+L1 / F3 steps the presets, F4 glow, F5 CRT scanlines
   Exit: hold Select+Start for 1 second / Esc
   The first pad is player 1, the second player 2.
+  Adjustments (operator menu): player 1's left/right picks one, player 2's
+  left/right (A D) changes it, as do player 1's up/down (Up Down).
 
 Graphics presets (--gfx <preset>)
   classic, classic-crt, crisp, smooth, hd-crisp, hd-smooth, hd-glow, hd-glow-crt
