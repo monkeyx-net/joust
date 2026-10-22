@@ -51,6 +51,7 @@
  *     controls; RAM and the CMOS after every step
  *   - the lava troll and sinking (sim/troll.c, $D899): player 1 over a
  *     pit near the lava's line, the game's task list run frame by frame
+ *   - the ROM check's last step ($ED03) on random sums ($7A75 for a wrong one)
  *   - the pterodactyl's task step by step (to the sleep, $E15F) from a
  *     random flight or its death ($6828), through the body's pixels, to
  *     the points; all of RAM after each step
@@ -951,6 +952,23 @@ static void troll_cases(void)
            steps, troll_seen[0], troll_seen[1], troll_seen[2], troll_seen[3]);
 }
 
+/* the ROM check's last step ($ED03) with random sums: a wrong one bumps a
+   random byte ($7A75) */
+static void checksum_cases(void)
+{
+    long wrong = 0;
+    for (int i = 0; i < 200; i++) {
+        memcpy(board.ram, base, sizeof base);
+        poke_word(TASK_U + 5, 0xED03);
+        poke_word(TASK_U + 0xD, 0x7FFE);
+        board.ram[TASK_U + 0xF] = (uint8_t)rnd();
+        poke_word(TASK_X, TASK_U);
+        wrong += (uint8_t)(data[0x7FFE] + board.ram[TASK_U + 0xF]) != data[0xEEC1];
+        if (one_step("ROM check", i, TASK_U, TASK_X)) return;
+    }
+    printf("test_routines: the ROM check's end: 200 cases, %ld wrong sums\n", wrong);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -987,6 +1005,7 @@ int main(int argc, char **argv)
     burn_cases();
     hiscore_cases();
     troll_cases();
+    checksum_cases();
     if (failures) {
         fprintf(stderr, "test_routines: %d differences\n", failures);
         return 1;

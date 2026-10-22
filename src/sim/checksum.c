@@ -26,6 +26,12 @@ StepResult checksum_step(Game *g, uint16_t u, uint16_t at)
     game_poke(g, (uint16_t)(u + SUM), a);
     game_set_word(g, (uint16_t)(u + POINTER), x);
     if (!(x & 0x8000)) return task_sleep(g, 1, CHECKSUM_NEXT); /* BPL on the pointer's store */
-    if (a == game_read(g, EXPECTED)) return start(g, u);
-    return STEP_UNPORTED; /* JSR $7A75 */
+    if (a != game_read(g, EXPECTED)) { /* $7A75: a wrong sum: a random byte of $A000-$AFFF bumped */
+        int carry;
+        uint8_t r = game_random(g, &carry);
+        uint16_t d = (uint16_t)((uint8_t)(r << 1 | carry) * 0x10);
+        at = (uint16_t)(((d >> 8) | 0xA0) << 8 | (d & 0xFF));
+        game_poke(g, at, (uint8_t)(game_peek(g, at) + 1));
+    }
+    return start(g, u);
 }
