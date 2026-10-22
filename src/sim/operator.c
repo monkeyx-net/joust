@@ -716,6 +716,7 @@ enum {
     P_ADJUST_P2_REPEAT, P_ADJUST_P2_DONE,
     P_FINISH, P_FINISH_RELEASE, P_FINISH_AUDITS, P_FINISH_SCORES, P_FINISH_MESSAGE, P_FINISH_MESSAGE_ON,
     P_FINISH_PLACE, P_FINISH_PLACE_HELD, P_FINISH_BEST, P_FINISH_BEST_ON, P_FINISH_LAST,
+    P_BURN, P_BURN_RAM, P_BURN_CHECK,
     P_ADV_PRESS, P_ADV_RELEASE, P_WAIT,
 };
 
@@ -1234,14 +1235,47 @@ void operator_frame(Operator *o, Game *g)
             o->pc = P_FINISH_LAST;
             break;
         }
-        case P_FINISH_LAST:
+        case P_FINISH_LAST: {
+            int burn = rd(g, 0xCC1F) & 0x0F;
+            if (burn) {
+                poke(g, 0xCC1F, 0);
+                adjust_check(g);
+            }
             if (rd(g, 0xCC19) & 0x0F) { /* $3CE5: the factory settings at the check */
                 poke(g, 0xCC8C, (uint8_t)(peek(g, 0xCC8C) + 1));
                 poke(g, 0xCC8C, (uint8_t)(peek(g, 0xCC8C) + 1));
                 poke(g, 0xCC19, 0);
             }
-            o->pc = P_CMOS_CHECK; /* ($CC1F's endless self-test is not here) */
+            o->pc = burn ? P_BURN : P_CMOS_CHECK;
             break;
+        }
+
+        /* ---- the endless self-test ($F46B, through $F006): until the power goes off ---- */
+        case P_BURN:
+            game_poke(g, 0xC807, 0x3C);
+            o->seed = (uint16_t)(word(g, 0xA6D0) + 0x1234);
+            o->count = 0x8F - 0x80;
+            o->pc = P_BURN_RAM;
+            break;
+        case P_BURN_RAM:
+            o->seed = ram_pass(g, o->seed);
+            wait_then(o, 104, --o->count ? P_BURN_RAM : P_BURN_CHECK);
+            return;
+        case P_BURN_CHECK:
+            if (!rom_test(g)) {
+                text_message_small(g, 0x08, 0x22, 0x4090);
+                o->pc = 0;
+                return;
+            }
+            if (!operator_cmos_test(g)) { /* (block 3 or 4, for good) */
+                start_clear_screen(g);
+                text_block(g, 0x03, 0, 0);
+                o->pc = 0;
+                return;
+            }
+            operator_bars(g);
+            wait_then(o, 4 * 26, P_BURN);
+            return;
         default:
             return;
         }

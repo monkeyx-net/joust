@@ -458,8 +458,10 @@ named; `game` checks each (section 3).
   waits), then ($3C57) the special entries: clear the audits or the high
   scores, the operator's two message lines (the initials input, then the
   line's column moved with the stick), the best one's name, the factory
-  settings (by spoiling the adjustments' sum for the check). Not ported:
-  $CC1F's endless self-test loop, the LEDs.
+  settings (by spoiling the adjustments' sum for the check), and $CC1F's
+  endless self-test ($F46B: 15 RAM passes from [$A6D0] + $1234, the ROM
+  and CMOS tests, the colour bars, again until the power goes off). The
+  board's diagnostic LEDs are not shown.
 - **Burning and the lava's fire** (`sim/burn.c`): $81A0 (a platform
   burning away: its picture flashed five times, $2A every other 10
   frames; an erase node, $8240, whose line comes from the CPU's Y as the
