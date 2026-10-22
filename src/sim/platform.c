@@ -1,6 +1,7 @@
 #include "sim/platform.h"
 
 #include "sim/collide.h"
+#include "sim/troll.h"
 
 #define DX 0xA034   /* <$34 */
 #define MET 0xA04B  /* <$4B */
@@ -165,7 +166,7 @@ int platform_class(Game *g, uint16_t u, uint8_t top)
         /* $D9FC: the lava's line */
         if (!game_peek(g, 0xA0A0) && !game_peek(g, 0xA096)) {
             uint8_t type = game_peek(g, field(u, 2));
-            if (type == 0x89 || type == 0x8F) return -1; /* the troll's hand */
+            if (type == 0x89 || type == 0x8F) troll_hand(g, u);
         }
         return game_peek(g, field(u, 0xB)) ? 1 : 0;
     }

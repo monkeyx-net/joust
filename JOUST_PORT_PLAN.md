@@ -349,6 +349,21 @@ named; `game` checks each (section 3).
   +$1B, which counts down); while <$A1 is set, every $70
   looks (+B) one more brain may run at once (<$8F up, kept from wrapping,
   when <$90). No enemies left: the wave's end ($6BDC, not ported).
+- **The lava troll and the lava** (`sim/troll.c`, $D9FC, $69DA-$6B1F,
+  $D7C8, $D916; $D899 in `sim/rider.c`): a player or a type-$8F rider at
+  the lava's top bits (a pit, once the bridges burnt) with no hand out
+  (<$96) and the lava up (<$A0 0) gets a hand task ($69DD, type $15,
+  just before it): it rises a frame of [$002A] every [$B1AE] frames while
+  the rider stays in the air over a pit (x - 2 to $28 or from $F0, line
+  $C6 on), sinks back when it leaves; at the top it climbs to the rider's
+  line + 3 and grabs (the sound $EF83, a grip task $6A66 after the rider,
+  the rider's motion +$30 to $D916, the pull $B302 from $B1B0, one more
+  every $708 frames up to $500). Held: the velocity takes the pull; one
+  past $FE80 up frees the rider (50 points, the hand back down), one past
+  $E6 is the lava. In the lava ($D899, also from the motion at $D858):
+  the sound $EFCB (a player) or $EF9A, sinking a line every 3 frames to
+  $F4 drawn clipped at $E0, the rider lost on the way (its table's +$10:
+  a player's death, an enemy's egg), then the table's +$E routine.
 - **The waves between them** (`sim/waves.c`): $6BC3 starts a game's
   (wave 0, the record at $702F, two easy waves, 32 frames); $6BDC ends one
   (no enemies left): <$3C down, the settings at $B1AD (a word and a
@@ -628,7 +643,8 @@ named; `game` checks each (section 3).
   the CMOS difficulty at random: about 100000 steps, 230 platform
   changes, 1000 eggs); the burning platforms, bridges and flames step by
   step to their end (300, the CPU's Y at random); $83D8 takes the pterodactyl's table too (60 killed); a
-  high score entry (300 game overs with random scores and controls, the
+  lava troll (60 hovers over a pit, the game's list run frame by frame:
+  hands, grabs, escapes and sinking); the high score entry (300 game overs with random scores and controls, the
   list run frame by frame: about 23000 steps, 80 over the limit of 5); a
   riderless mount's brain (20000 near its knight or not: about 700 pick
   it up, 5600 hop); $77BE, points placed among two displays near them

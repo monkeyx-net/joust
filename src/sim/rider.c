@@ -3,15 +3,21 @@
 #include <stddef.h>
 
 #include "sim/brains.h"
+#include "sim/death.h"
+#include "sim/eggs.h"
 #include "sim/display.h"
 #include "sim/platform.h"
 #include "sim/score.h"
 #include "sim/tasks.h"
+#include "sim/troll.h"
 
 #define CONTROLS 0xA032 /* <$32: the direction (-1, 0, 1), <$33 the flap */
 #define GRAVITY 0xA048  /* <$48 */
 #define SPEEDS 0xDCD5   /* x per frame (8.8) by +$14 */
 #define FLYING 0xD858
+#define HELD 0xD916     /* by the troll's hand (sim/troll.c) */
+#define LAVA_ON 0xD8B3  /* sinking */
+#define LAVA_GONE 0xD8E6
 #define P1_BRAIN 0xDDB2
 #define P2_BRAIN 0xDDB9
 #define AWAY_BRAIN 0xEEC2 /* flies to a line and off the side of the screen */
@@ -28,7 +34,7 @@
 int rider_ported(uint16_t at)
 {
     return at == RIDER_FLAPPING || at == RIDER_GLIDING || at == RIDER_STANDING || at == RIDER_AIRBORNE ||
-           at == AWAY_GONE || at == RIDER_FALL;
+           at == AWAY_GONE || at == RIDER_FALL || at == LAVA_ON || at == LAVA_GONE;
 }
 
 static uint16_t field(uint16_t u, int off) { return (uint16_t)(u + off); }
@@ -312,10 +318,78 @@ static StepResult air_end(Game *g, uint16_t u, uint8_t frame, uint16_t resume)
     return rest(g, u, resume);
 }
 
+/* the table's +$E routine: $8AA7 the task ends; $8AAA a player's next life */
+static StepResult gone(Game *g, uint16_t u)
+{
+    uint16_t then = table(g, u, 0x0E);
+    if (then == 0x8AA7) return task_end(g);
+    if (then != 0x8AAA) return STEP_UNPORTED;
+    if (!score_life_used(g, game_word(g, field(u, 0xD)))) return task_end(g);
+    game_poke(g, field(u, 0x16), game_peek(g, 0xA038));
+    game_poke(g, 0xA038, (uint8_t)(game_peek(g, 0xA038) + 1));
+    return task_sleep(g, 1, 0x8B1A);
+}
+
+/* $D8EB: a node and, with a rider, the one before it clipped at the lava;
+   returns the last clipped */
+static uint16_t clip_pictures(Game *g, uint16_t u, uint16_t node)
+{
+    display_clip(g, node);
+    if (!game_word(g, field(u, 0x1E))) return node;
+    node = (uint16_t)(node - 10);
+    display_clip(g, node);
+    return node;
+}
+
+/* $D8A8: drawn sinking, 3 frames */
+static StepResult lava_draw(Game *g, uint16_t u)
+{
+    clip_pictures(g, u, rider_pictures(g, u, 1));
+    return task_sleep(g, 3, LAVA_ON);
+}
+
+StepResult rider_lava(Game *g, uint16_t u)
+{
+    game_sound(g, game_peek(g, field(u, 2)) == 0x89 ? 0xEFCB : 0xEF9A);
+    return lava_draw(g, u);
+}
+
+/* $D8B3: a line deeper; the rider lost once its picture is under */
+static StepResult lava_on(Game *g, uint16_t u)
+{
+    uint16_t x = clip_pictures(g, u, rider_pictures(g, u, 0));
+    if ((game_peek(g, field(u, 2)) & 0x80) && game_read(g, (uint16_t)(x + 7)) != 3) {
+        game_poke(g, field(u, 2), game_peek(g, field(u, 2)) & 0x7F);
+        game_set_word(g, field(u, 0x1E), 0);
+        game_set_word(g, field(u, 0x1A), 0);
+        uint16_t then = table(g, u, 0x10);
+        if (then == 0x74C3) eggs_lay(g, u, 0);
+        else if (then == 0x8279 || then == 0x827F) death_player(g, u, 0, then == 0x827F);
+        else return STEP_UNPORTED;
+    }
+    game_poke(g, field(u, 0xB), (uint8_t)(game_peek(g, field(u, 0xB)) + 1));
+    if (game_peek(g, field(u, 0xB)) < 0xF4) return lava_draw(g, u);
+    return task_sleep(g, 0x1E, LAVA_GONE);
+}
+
+/* [+$30]: the motion (b the gravity's part, 0 or 4): 0 on, 1 the step
+   ended (*r: into the lava), -1 not ported */
+static int motion(Game *g, uint16_t u, uint8_t b, StepResult *r)
+{
+    uint16_t m = game_word(g, field(u, 0x30));
+    if (m == HELD) return troll_held(g, u, b, r);
+    if (m != FLYING) return -1;
+    if (!fly(g, u, b)) return 0;
+    *r = rider_lava(g, u); /* $D899 */
+    return 1;
+}
+
 /* $8F43: gliding */
 static StepResult glide(Game *g, uint16_t u)
 {
-    if (fly(g, u, 4)) return STEP_UNPORTED;
+    StepResult end;
+    int m = motion(g, u, 4, &end);
+    if (m) return m > 0 ? end : STEP_UNPORTED;
     uint8_t frame = 0x60;
     if ((int8_t)game_peek(g, field(u, 0x15)) > 0) {
         game_poke(g, field(u, 0x15), (uint8_t)(game_peek(g, field(u, 0x15)) - 1));
@@ -337,7 +411,9 @@ static StepResult flapped(Game *g, uint16_t u)
 /* $8F0A: flapping on: no lift, the flap's frames counted down */
 static StepResult flap_on(Game *g, uint16_t u)
 {
-    if (fly(g, u, 0)) return STEP_UNPORTED;
+    StepResult end;
+    int m = motion(g, u, 0, &end);
+    if (m) return m > 0 ? end : STEP_UNPORTED;
     if ((int8_t)game_peek(g, field(u, 0x15)) > 0) game_poke(g, field(u, 0x15), (uint8_t)(game_peek(g, field(u, 0x15)) - 1));
     return air_end(g, u, 0x48, RIDER_FLAPPING);
 }
@@ -496,17 +572,13 @@ StepResult rider_step(Game *g, uint16_t u, uint16_t at)
     if (at == RIDER_STANDING) return ground(g, u);
     if (at == RIDER_AIRBORNE) return airborne(g, u);
     if (at == RIDER_FALL) return fall_off(g, u);
-    if (at == AWAY_GONE) { /* off the screen: the table's +$E routine */
+    if (at == AWAY_GONE) { /* off the screen */
         game_set_word(g, field(u, 7), 0x0096);
-        uint16_t then = table(g, u, 0x0E);
-        if (then == 0x8AA7) return task_end(g);
-        if (then != 0x8AAA) return STEP_UNPORTED;
-        if (!score_life_used(g, game_word(g, field(u, 0xD)))) return task_end(g); /* $8AAA: a player's next life */
-        game_poke(g, field(u, 0x16), game_peek(g, 0xA038));
-        game_poke(g, 0xA038, (uint8_t)(game_peek(g, 0xA038) + 1));
-        return task_sleep(g, 1, 0x8B1A);
+        return gone(g, u);
     }
-    if (game_word(g, field(u, 0x30)) != FLYING) return STEP_UNPORTED;
+    if (at == LAVA_ON) return lava_on(g, u);
+    if (at == LAVA_GONE) return gone(g, u);
+    if (game_word(g, field(u, 0x30)) != FLYING && game_word(g, field(u, 0x30)) != HELD) return STEP_UNPORTED;
     StepResult slept = STEP_DONE;
     int r = think(g, u, &slept);
     if (r == BRAIN_SLEPT) return slept;
@@ -523,6 +595,8 @@ StepResult rider_step(Game *g, uint16_t u, uint16_t at)
     if (!flapping) return glide(g, u);
     /* $8F63: a new flap */
     flap(g, u);
-    if (fly(g, u, 0)) return STEP_UNPORTED;
+    StepResult end;
+    int m = motion(g, u, 0, &end);
+    if (m) return m > 0 ? end : STEP_UNPORTED;
     return flapped(g, u);
 }

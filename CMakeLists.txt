@@ -69,6 +69,7 @@ add_library(joust_core STATIC
   src/sim/start.c
   src/sim/attract.c
   src/sim/hiscores.c
+  src/sim/troll.c
   src/emu/m6809.c
   src/emu/pia6821.c
   src/emu/board.c

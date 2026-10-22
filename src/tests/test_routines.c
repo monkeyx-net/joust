@@ -49,6 +49,8 @@
  *     and the entry tasks it makes, the list run frame by frame (sleeps
  *     counted down, a step each as they run out) with random scores and
  *     controls; RAM and the CMOS after every step
+ *   - the lava troll and sinking (sim/troll.c, $D899): player 1 over a
+ *     pit near the lava's line, the game's task list run frame by frame
  *   - the pterodactyl's task step by step (to the sleep, $E15F) from a
  *     random flight or its death ($6828), through the body's pixels, to
  *     the points; all of RAM after each step
@@ -824,15 +826,15 @@ static long run_list(const char *what, int i, int frames, void (*controls)(int f
     for (int f = 0; f < frames; f++) {
         if (stop && (uint16_t)(board.ram[TASK_U + 5] << 8 | board.ram[TASK_U + 6]) > stop) break;
         controls(f);
+        poke_word(0xA02A, 0xAA00); /* the display list starts over each frame */
         uint16_t prev = 0xA00A;
         for (uint16_t t = (uint16_t)(board.ram[0xA00A] << 8 | board.ram[0xA00B]); t;) {
             if (!board.ram[t + 3] && !--board.ram[t + 4]) {
                 if ((uint16_t)(board.ram[t + 5] << 8 | board.ram[t + 6]) == 0x486C) hiscore_limited++;
                 if (one_step(what, i, t, prev)) return -1;
                 steps++;
-                uint16_t next = (uint16_t)(board.ram[prev] << 8 | board.ram[prev + 1]);
-                if (next != t) { /* it ended */
-                    t = next;
+                if ((uint16_t)(board.ram[0xA008] << 8 | board.ram[0xA009]) == t) { /* it ended: on from the one before */
+                    t = (uint16_t)(board.ram[prev] << 8 | board.ram[prev + 1]);
                     continue;
                 }
             }
@@ -896,6 +898,59 @@ static void hiscore_cases(void)
            steps, entries, limited);
 }
 
+static long troll_seen[4]; /* hands out, grabs, held steps, sinking steps */
+
+static int troll_ceiling; /* the line the player flaps to stay above */
+
+static void troll_controls(int frame)
+{
+    uint16_t p = base_player;
+    /* hover: flap (alternate frames) while low, now and then let go */
+    board.inp1 = board.ram[p + 0xB] >= troll_ceiling && (frame & 1) && rnd() % 16 ? INP_FLAP : 0;
+    for (uint16_t t = (uint16_t)(board.ram[0xA00A] << 8 | board.ram[0xA00B]); t;
+         t = (uint16_t)(board.ram[t] << 8 | board.ram[t + 1])) {
+        uint16_t at = (uint16_t)(board.ram[t + 5] << 8 | board.ram[t + 6]);
+        troll_seen[0] += at == 0x69DD;
+        troll_seen[1] += at == 0x6A66 || at == 0x6A63;
+        troll_seen[3] += at == 0xD8B3;
+    }
+    troll_seen[2] += board.ram[p + 0x30] == 0xD9 && board.ram[p + 0x31] == 0x16;
+}
+
+/* the lava troll (sim/troll.c) and sinking into the lava: the game in
+   progress with player 1 over a pit near the lava's line, the task list
+   run frame by frame, the player flapping at random */
+static void troll_cases(void)
+{
+    long steps = 0;
+    for (int i = 0; i < 60; i++) {
+        memcpy(board.ram, base, sizeof base);
+        uint16_t p = base_player;
+        int right = rnd() % 2;
+        poke_word((uint16_t)(p + 7), (uint16_t)(right ? 0xF8 + rnd() % 0x20 : 0x08 + rnd() % 0x20));
+        board.ram[p + 0xA] = 0;
+        board.ram[p + 0xB] = (uint8_t)(0xC8 + rnd() % 0x10);
+        poke_word((uint16_t)(p + 0x11), (uint16_t)(rnd() % 0x40));
+        poke_word((uint16_t)(p + 0x20), 0);
+        poke_word((uint16_t)(p + 0x30), 0xD858);
+        poke_word((uint16_t)(p + 5), 0x8F3D);
+        board.ram[0xA0A0] = 0;
+        board.ram[0xA096] = 0;
+        board.ram[0xA0A8] = 0;
+        board.ram[0xA09F] = 0;
+        for (int x = 0; x < 0x140; x++) { /* the bridges burnt ($8648): the pits open */
+            uint8_t m = board.ram[0xB002 + x];
+            board.ram[0xB002 + x] = (uint8_t)((m & ~0x20) | (data[0xEBB8 + x] & 0x20));
+        }
+        board.inp1 = 0;
+        troll_ceiling = 0xCC + (int)(rnd() % 0x10);
+        long n = run_list("troll", i, 600, troll_controls, 0);
+        if (n > 0) steps += n;
+    }
+    printf("test_routines: the troll: 60 cases, %ld steps; hands %ld, grabs %ld, held %ld, sinking %ld (task-frames)\n",
+           steps, troll_seen[0], troll_seen[1], troll_seen[2], troll_seen[3]);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -931,6 +986,7 @@ int main(int argc, char **argv)
     waves_cases();
     burn_cases();
     hiscore_cases();
+    troll_cases();
     if (failures) {
         fprintf(stderr, "test_routines: %d differences\n", failures);
         return 1;

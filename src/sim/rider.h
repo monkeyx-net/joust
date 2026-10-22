@@ -33,6 +33,9 @@ StepResult rider_step(Game *g, uint16_t task, uint16_t at);
    speed table `speeds` (8.8 pixels by +$14): 0, or -1 into the lava (not
    ported) */
 int rider_fly(Game *g, uint16_t u, uint16_t vel, uint16_t speeds);
+/* $D899: into the lava: sinking a line every 3 frames to $F4, the rider
+   lost on the way (its table's +$10), then the table's +$E routine */
+StepResult rider_lava(Game *g, uint16_t u);
 /* $8E05: frame `frame`, its box (+$26-29) and pictures (+$1C/+$1E) */
 void rider_frame(Game *g, uint16_t u, uint8_t frame);
 /* $DDD2: x moved by dx, with the push at +$22 and the screen's wrap */

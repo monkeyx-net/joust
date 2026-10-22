@@ -113,7 +113,8 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   burning away, the lava bridges and flames), `cycle.c` (the colour cycle),
   `start.c` (the shell: start buttons, a game's set-up, game over, the
   demo), `attract.c` (the title page: logo, border lights), `hiscores.c`
-  (the system ROM's high score table and entry); each mirrors a ROM routine's arithmetic exactly
+  (the system ROM's high score table and entry), `troll.c` (the lava
+  troll's hand); each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
 - `web/` - page shell for the Emscripten build

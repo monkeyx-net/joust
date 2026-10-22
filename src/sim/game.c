@@ -24,6 +24,7 @@
 #include "sim/wave.h"
 #include "sim/waves.h"
 #include "sim/tasks.h"
+#include "sim/troll.h"
 
 #define RNG 0xA00D          /* <$0D-<$0E */
 #define SOUND_TIMER 0xA061  /* <$61: frames until the queued sound goes out */
@@ -186,7 +187,7 @@ void game_sound(Game *g, uint16_t script)
 int game_step_ported(const Game *g, uint16_t task)
 {
     uint16_t at = game_word(g, (uint16_t)(task + TASK_RESUME));
-    return checksum_ported(at) || lava_ported(at) || collide_ported(at) || scores_ported(at) || flow_ported(at) || rider_ported(at) || wave_ported(at) || eggs_ported(at) || spawn_ported(at) || ptero_ported(at) || points_ported(at) || death_ported(at) || waves_ported(at) || burn_ported(at) || cycle_ported(at) || start_ported(at) || attract_ported(at) || hiscores_ported(at);
+    return checksum_ported(at) || lava_ported(at) || collide_ported(at) || scores_ported(at) || flow_ported(at) || rider_ported(at) || wave_ported(at) || eggs_ported(at) || spawn_ported(at) || ptero_ported(at) || points_ported(at) || death_ported(at) || waves_ported(at) || burn_ported(at) || cycle_ported(at) || start_ported(at) || attract_ported(at) || hiscores_ported(at) || troll_ported(at);
 }
 
 StepResult game_step(Game *g, uint16_t task)
@@ -210,5 +211,6 @@ StepResult game_step(Game *g, uint16_t task)
     if (start_ported(at)) return start_step(g, task, at);
     if (attract_ported(at)) return attract_step(g, task, at);
     if (hiscores_ported(at)) return hiscores_step(g, task, at);
+    if (troll_ported(at)) return troll_step(g, task, at);
     return STEP_UNPORTED;
 }
