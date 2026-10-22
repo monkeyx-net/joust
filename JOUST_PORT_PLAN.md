@@ -328,8 +328,9 @@ named; `game` checks each (section 3).
   brains are not ported yet.
 - **The wave** (`sim/wave.c`, its manager's frequent path): $6D91 every 8
   frames while enemies are left (<$AA): <$AC frames held, then <$AD-AE
-  counted down to the pterodactyl ($68A8, at most 3 a wave by <$AB; not
-  ported; the next wait from $6DE2 by +$1B); while <$A1 is set, every $70
+  counted down to the pterodactyl ($6DAE: a task $68A8 of type $17 after
+  it, +$34 set; at most 3 a wave by <$AB; the next wait from $6DE2 by
+  +$1B, which counts down); while <$A1 is set, every $70
   looks (+B) one more brain may run at once (<$8F up, kept from wrapping,
   when <$90). No enemies left: the wave's end ($6BDC, not ported).
 - **The spawn** (`sim/spawn.c`, $87B0-$883D, $8B2D-$8D22): four pads, the
@@ -369,6 +370,39 @@ named; `game` checks each (section 3).
   the frames at $791E/$7921, one by vertical speed (rising, falling past
   $80, or between), offset into the records at [$0028], clipped at line
   $E0 ($D8F4).
+- **The pterodactyl** (`sim/ptero.c`, $6640-$69BE): $68A8 (or $68A5,
+  clearing +$34) clears +7-+$35, picks a side by the random carry (x $FFF7
+  facing right at speed index 2, or $0123 turned), counts the players by
+  thirds of the screen ($D800: <$88-<$8A) and starts at line $D1, or $80
+  with one in the bottom third, or $3D with others in the middle; brain
+  $6640, the sound $EF78, type | $80, +$26 $80, table $8A14, +$35 $78,
+  +$2F $3C ($8A for the manager's). Each frame ($6925): the brain
+  ([+$24], via $D83D), +$13 counted, the erase node; the wing beat
+  (+$15 frames, then +$10 down by 2 through $69BF's frame/frames pairs);
+  the flight ($D861: the velocity +$11 with no gravity, the ceiling, x by
+  $69CF's speeds, ±0.75 or ±3 a frame); $6951: the picture [$0034] + frame
+  (+6 facing left), the line kept at most $D2, the box (10 lines, $1B
+  wide), the draw node ($8E83); with no enemies left (<$AA), or a
+  manager's one once <$AC is set (<$AB down), the brain becomes $67B3; the
+  platforms beside it ($AEA2/$AEAC + x against $E83D/$E83E + line, $DA3E).
+  Brain: $6640 every +$2F frames (reloaded from +$35, which drops to $0F)
+  aims at $80D6's player (+$2B its x, +$2E its line less 5, capped at
+  $D2, +2 for a manager's); without one ($66F4) it makes for line $43, $7F
+  or $CE by its third ($88 near the sides for a manager's), the velocity
+  ±$20 a frame up to ±$100, a quarter when there; level with the target
+  (+$2E within $0F) a swoop ($6695: +$33 $80, a manager's velocity
+  quartered, the sound $EF7D; on while +$33 lasts and x is $0D or more
+  short of +$2B: velocity ±$10 toward +$2E, the frame $18 holding the wing
+  10 frames; fast, speed 8); above or below it a climb ($6779/$67A2, then
+  $6795 for 2 frames); slow is speed 4; a push (+$22) sets the side.
+  $67B3 heads for its third's line and, past x -7 or $121, leaves ($6808:
+  erased, type bit 7 off, 60 frames, the task ends). Killed ($74AE, its
+  table's +$10: +$2D 7, brain $6828, the sound $EF6D): facing turned (a
+  manager's: <$AB down, <$B0 = 1), 8 blinks of frames $18 and $0C, 4
+  frames each, facing cleared for the last 4; then its body as pixels
+  straight into video RAM ($6895, $8209: runs of nibble pairs from
+  [$0038], drawn twice 2 frames apart, then 6 frames, three times), its
+  node's control set to $12, and the points ($7861, not ported).
 - **A secret code** ($6B20-$6BA5, in `sim/flow.c`): during a game a task
   watches both players' controls ($6BA6) for $2502, then $1204, then
   $0506 (player 1 left+flap with start 1 and player 2 right; start 2 with
@@ -465,7 +499,11 @@ named; `game` checks each (section 3).
   game in progress with the player at random x, line, velocity, speed and
   push (20000: 2192 land, 2236 bounce; $DC21's end rows checked too),
   $80D6 on random players near each other or not, missing or out (20000:
-  X and the Z flag).
+  X and the Z flag), the pterodactyl's brain states (20000 on a game in
+  progress: about 2100 aiming at a player, 5000 swooping, 350 leaving)
+  and its task step by step (1000 random flights and deaths, each step
+  run to the ROM's sleep at $E15F: about 90000 steps, 1000 drawing its
+  body); $83D8 takes the pterodactyl's table too (60 killed).
 - **MAME** (label `mame`): `mame_rom_map`, `mame_capture` (video RAM and
   palette decoding against MAME snapshots), `mame_images` (the blitter
   against MAME's, per image and mode); later per-frame RAM traces of

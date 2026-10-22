@@ -169,6 +169,11 @@ static int fly(Game *g, uint16_t u, uint8_t b)
     b = (uint8_t)(b + game_peek(g, GRAVITY));
     uint16_t vel = (uint16_t)((int8_t)b + game_word(g, field(u, 0x11)));
     game_set_word(g, field(u, 0x11), vel);
+    return rider_fly(g, u, vel, SPEEDS);
+}
+
+int rider_fly(Game *g, uint16_t u, uint16_t vel, uint16_t speeds)
+{
     uint16_t d = (uint16_t)(vel + game_word(g, field(u, 0xB)));
     uint8_t a = (uint8_t)((d >> 8) + game_peek(g, field(u, 0x23)));
     d = (uint16_t)(a << 8 | (d & 0xFF));
@@ -182,7 +187,7 @@ static int fly(Game *g, uint16_t u, uint8_t b)
     }
     if (a >= 0xE6) return -1;
     game_set_word(g, field(u, 0xB), d);
-    uint16_t speed = game_read_word(g, (uint16_t)(SPEEDS + (int8_t)game_peek(g, field(u, 0x14))));
+    uint16_t speed = game_read_word(g, (uint16_t)(speeds + (int8_t)game_peek(g, field(u, 0x14))));
     uint16_t frac = (uint16_t)((speed & 0xFF) + game_peek(g, field(u, 0x16)));
     game_poke(g, field(u, 0x16), (uint8_t)frac);
     rider_move_x(g, u, (uint8_t)((speed >> 8) + (frac >> 8)));

@@ -56,3 +56,25 @@ uint16_t display_object(Game *g, uint16_t u, int chain, int nodes)
     }
     return node;
 }
+
+uint16_t display_pixels(Game *g, uint16_t u, uint16_t y)
+{
+    uint16_t x = game_word(g, (uint16_t)(u + 0x10));
+    for (;;) {
+        uint8_t a = game_read(g, y++);
+        if (!a) return y;
+        uint8_t b = (uint8_t)((a & 0x0F) * 0x11);
+        a >>= 4;
+        if (!a) { /* the next line, from the first column */
+            x = (uint16_t)(game_word(g, (uint16_t)(u + 0x10)) + 1);
+            game_set_word(g, (uint16_t)(u + 0x10), x);
+            continue;
+        }
+        for (; a; a--) {
+            if (a == 1) b &= 0xF0;
+            if (x < GAME_RAM) game_poke(g, x, b);
+            x = (uint16_t)(x + 0x100);
+            if (x > 0x9800) break;
+        }
+    }
+}

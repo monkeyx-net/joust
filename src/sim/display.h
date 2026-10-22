@@ -32,4 +32,9 @@ void display_fill(Game *g, uint16_t node, uint16_t rec);
 /* $D8F4: clip a node at line $E0 (the lava): shortened, or emptied */
 void display_clip(Game *g, uint16_t node);
 
+/* $8209: pixels straight into video RAM from +$10 (the column, the
+   line) of the task at u: each byte at y a run (high nibble: columns,
+   the last only its left pixel; low: the colour), 0 in the high nibble
+   the next line, a 0 byte the end. Returns the address after it. */
+uint16_t display_pixels(Game *g, uint16_t u, uint16_t y);
 #endif

@@ -29,6 +29,10 @@
 int rider_ported(uint16_t at);
 StepResult rider_step(Game *g, uint16_t task, uint16_t at);
 
+/* $D861: on in the air at vertical velocity vel (8.8 lines), x by the
+   speed table `speeds` (8.8 pixels by +$14): 0, or -1 into the lava (not
+   ported) */
+int rider_fly(Game *g, uint16_t u, uint16_t vel, uint16_t speeds);
 /* $8E05: frame `frame`, its box (+$26-29) and pictures (+$1C/+$1E) */
 void rider_frame(Game *g, uint16_t u, uint8_t frame);
 /* $DDD2: x moved by dx, with the push at +$22 and the screen's wrap */
