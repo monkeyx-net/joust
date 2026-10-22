@@ -3,6 +3,22 @@
 ---
 ## Changelog
 
+### v0.2.2 (2026-10-22)
+
+#### Build & Platforms
+
+- **macOS build** — Joust now builds on macOS with Homebrew's SDL2
+  (`brew install sdl2 pkg-config`, then the usual CMake build); saves go to
+  `$XDG_DATA_HOME/joust` or `~/.local/share/joust`, as on Linux.
+- **macOS package** — new `package_macos` target writes
+  `joust-<version>-macos-<arch>.tar.gz` (the program, `README-native.txt`,
+  `LICENSE` and `NOTICE`; no ROM data, players add their own `joust.zip`).
+- **CI** — a `build-macos` job on GitHub's arm64 macOS runners builds with
+  ccache, runs the tests, makes the arm64 tarball and adds it to the release
+  beside the Linux, PortMaster, Windows and web archives.
+- **README** — macOS in the platform list, a Homebrew build section and the
+  macOS step of the CI process.
+
 ### v0.2.1 (2026-10-22)
 
 #### Game

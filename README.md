@@ -1,7 +1,7 @@
 # Joust - native SDL2 port (work in progress)
 
 A C11 / SDL2 port of the 1982 Williams arcade game for Linux handhelds
-(PortMaster: ArkOS, ROCKNIX, muOS, Knulli), desktops (Linux, Windows) and the
+(PortMaster: ArkOS, ROCKNIX, muOS, Knulli), desktops (Linux, Windows, macOS) and the
 web, checked against the original ROM running in MAME.
 
 **Status:** playable. The game is rewritten in C, routine by routine, from
@@ -129,6 +129,14 @@ cmake --build build --target package_windows
 
 The tests use POSIX calls, so on Windows only the game is built.
 
+### macOS (Homebrew)
+
+```bash
+brew install sdl2 pkg-config
+cmake -S . -B build -DJOUST_DEV_ASSETS=OFF && cmake --build build -j
+cmake --build build --target package_macos   # joust-<version>-macos-<arch>.tar.gz
+```
+
 ### Web (Emscripten)
 
 With the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html)
@@ -198,9 +206,11 @@ and by hand (Actions > Build > Run workflow):
    archives.
 3. **Windows x86_64:** MSYS2 MinGW64 with Ninja; builds the game, copies the
    MinGW DLLs it links (SDL2.dll) next to it and makes the Windows zip.
-4. **Web:** Emscripten; zips `build-web/web` as `joust-<version>-web.zip`
+4. **macOS arm64:** Homebrew SDL2 with ccache; build, run `ctest`, make the
+   macOS tarball.
+5. **Web:** Emscripten; zips `build-web/web` as `joust-<version>-web.zip`
    (no ROM: the page shows the test card until a ROM is added).
-5. **Release:** on a push whose version has no release yet, downloads every
+6. **Release:** on a push whose version has no release yet, downloads every
    build's archives and publishes GitHub release `vx.y.z` with generated
    notes.
 

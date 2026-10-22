@@ -1,6 +1,6 @@
 # Lay out and archive a release.
-#   cmake -DKIND=linux|portmaster|windows -DSRC=<repo> -DBIN=<build dir> -DGAME=<binary>
-#         -DARCH=<x86_64|aarch64> -DVERSION=<x.y.z> -P package.cmake
+#   cmake -DKIND=linux|portmaster|windows|macos -DSRC=<repo> -DBIN=<build dir> -DGAME=<binary>
+#         -DARCH=<x86_64|aarch64|arm64> -DVERSION=<x.y.z> -P package.cmake
 # Archives land in <build dir>/packages/. Windows packages also take every DLL
 # next to the binary (copy SDL2.dll there first). No ROM data is packaged:
 # players supply their own joust.zip.
@@ -20,6 +20,9 @@ file(REMOVE_RECURSE "${stage}")
 
 if(KIND STREQUAL "linux")
   set(root "${stage}/joust-${VERSION}-linux-${ARCH}")
+  set(exe_name "joust")
+elseif(KIND STREQUAL "macos")
+  set(root "${stage}/joust-${VERSION}-macos-${ARCH}")
   set(exe_name "joust")
 elseif(KIND STREQUAL "windows")
   set(root "${stage}/joust-${VERSION}-windows-${ARCH}")
@@ -45,9 +48,9 @@ endif()
 file(COPY "${SRC}/NOTICE" "${SRC}/LICENSE" DESTINATION "${root}")
 file(COPY "${SRC}/src/packaging/README-native.txt" DESTINATION "${root}")
 
-if(KIND STREQUAL "linux")
-  set(archive "${out}/joust-${VERSION}-linux-${ARCH}.tar.gz")
-  execute_process(COMMAND "${CMAKE_COMMAND}" -E tar czf "${archive}" "joust-${VERSION}-linux-${ARCH}"
+if(KIND STREQUAL "linux" OR KIND STREQUAL "macos")
+  set(archive "${out}/joust-${VERSION}-${KIND}-${ARCH}.tar.gz")
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E tar czf "${archive}" "joust-${VERSION}-${KIND}-${ARCH}"
                   WORKING_DIRECTORY "${stage}" RESULT_VARIABLE rc)
 elseif(KIND STREQUAL "windows")
   set(archive "${out}/joust-${VERSION}-windows-${ARCH}.zip")
