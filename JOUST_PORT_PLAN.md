@@ -515,7 +515,15 @@ named; `game` checks each (section 3).
   (`sim/hiscores.c`, $414F): the border ($FF87, solid blocks in colours
   stepping by $11), the best one's name and score, three columns of 13 in
   the large font and today's six in the small, the newest entries in
-  their players' colours. Not ported: the entry ($3B61) and $3BCD.
+  their players' colours. The entry ($464F after "game over"): a task
+  per player whose score makes today's table or the table ($4765: three
+  initials; $48E9 for the best ever: a name, then initials), the input
+  every 3 frames ($43F6/$4438: left and right step the letter, flap takes
+  it, $25 rubs out; A and B kept in +$32 as the ROM's registers, its
+  continuation at [+$C]), the entries moved down and written as nibble
+  pairs with check nibbles ($48B8, $3FA7, $3F88), at most 5 alike (the
+  oldest beyond deleted, $4091, with a message); the game over task waits
+  ($3B64) for them, then the attract mode ($624D).
 - **A secret code** ($6B20-$6BA5, in `sim/flow.c`): during a game a task
   watches both players' controls ($6BA6) for $2502, then $1204, then
   $0506 (player 1 left+flap with start 1 and player 2 right; start 2 with
@@ -620,6 +628,8 @@ named; `game` checks each (section 3).
   the CMOS difficulty at random: about 100000 steps, 230 platform
   changes, 1000 eggs); the burning platforms, bridges and flames step by
   step to their end (300, the CPU's Y at random); $83D8 takes the pterodactyl's table too (60 killed); a
+  high score entry (300 game overs with random scores and controls, the
+  list run frame by frame: about 23000 steps, 80 over the limit of 5); a
   riderless mount's brain (20000 near its knight or not: about 700 pick
   it up, 5600 hop); $77BE, points placed among two displays near them
   (20000: about 9900 wait).

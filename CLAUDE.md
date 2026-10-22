@@ -113,7 +113,7 @@ Release builds: `-DJOUST_DEV_ASSETS=OFF` (no source-tree fallbacks).
   burning away, the lava bridges and flames), `cycle.c` (the colour cycle),
   `start.c` (the shell: start buttons, a game's set-up, game over, the
   demo), `attract.c` (the title page: logo, border lights), `hiscores.c`
-  (the system ROM's high score table); each mirrors a ROM routine's arithmetic exactly
+  (the system ROM's high score table and entry); each mirrors a ROM routine's arithmetic exactly
 - `tests/` - C tests, MAME probes (`tests/mame/`)
 - `packaging/` - release layout script, PortMaster launcher and metadata
 - `web/` - page shell for the Emscripten build
@@ -171,7 +171,8 @@ Every change keeps `ctest` green.
   scoring, $D9A3, the pterodactyl's and a riderless mount's brains and
   points placed ($77BE) (on a game in progress) on
   20000 random cases each, and the pterodactyl's, the wave task and the
-  burning tasks step by step (each step run to its sleep, $E15F; the CPU's
+  burning tasks step by step, and the high score entry's tasks as a list
+  run frame by frame (each step run to its sleep, $E15F; the CPU's
   Y at random, `Game.y`; `Game.b` likewise for B); RAM and the CMOS.
   Keep the random cases possible in the game (e.g. only players collect
   eggs): an impossible state sends the ROM through garbage. Each call

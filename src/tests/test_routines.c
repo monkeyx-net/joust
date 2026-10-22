@@ -45,6 +45,10 @@
  *     settings' countdowns and the CMOS difficulty at random
  *   - the burning platforms, lava bridges and flames (sim/burn.c), step
  *     by step to their end (the CPU's Y at random as each step starts)
+ *   - the high score entry ($464F on, sim/hiscores.c): the game over task
+ *     and the entry tasks it makes, the list run frame by frame (sleeps
+ *     counted down, a step each as they run out) with random scores and
+ *     controls; RAM and the CMOS after every step
  *   - the pterodactyl's task step by step (to the sleep, $E15F) from a
  *     random flight or its death ($6828), through the body's pixels, to
  *     the points; all of RAM after each step
@@ -111,7 +115,7 @@ static uint16_t call(uint16_t pc, uint16_t stop)
     board.cpu.waiting = 0; /* (after frames the CPU may sit in a CWAI or SYNC, a line raised) */
     board.cpu.dp = 0xA0;   /* the game's direct page (a case before may have changed it) */
     board.cpu.irq = board.cpu.firq = board.cpu.nmi = 0;
-    for (long n = 0; n < 200000; n++) {
+    for (long n = 0; n < 20000000; n++) {
         if (board.cpu.pc == RETURN || (stop && board.cpu.pc == stop)) return board.cpu.pc;
         if (stop_at_outcomes)
             for (size_t k = 0; k < sizeof outcome_stops / sizeof outcome_stops[0]; k++)
@@ -776,6 +780,122 @@ static void burn_cases(void)
     printf("test_routines: burning platforms, lava bridges and flames: 300 cases, %ld steps\n", steps);
 }
 
+static int hiscore_limited; /* entries that went over the limit of 5 */
+
+/* One step of the task at t (ROM to its sleep at $E15F, and C), the block
+   before it at `prev`: 0 matched, -1 a difference (reported) */
+static int one_step(const char *what, int i, uint16_t t, uint16_t prev)
+{
+    uint16_t at = (uint16_t)(board.ram[t + 5] << 8 | board.ram[t + 6]);
+    poke_word(0xA02C, prev);
+    poke_word(0xA02E, t);
+    sync_model();
+    model.in0 = board.in0;
+    model.inp1 = board.inp1;
+    model.inp2 = board.inp2;
+    model.y = board.cpu.y;
+    model.b = board.cpu.b;
+    board.cpu.u = t;
+    tracing = getenv("ONLYH") && atoi(getenv("ONLYH")) == i && at == 0x4A05;
+    uint16_t end = call(at, 0xE15F);
+    tracing = 0;
+    StepResult r = game_step(&model, t);
+    if (end != 0xE15F || r != STEP_DONE) {
+        if (failures++ < 8)
+            fprintf(stderr, "test_routines: %s case %d at $%04X: ROM %s, C %s\n", what, i, at,
+                    end == 0xE15F ? "slept" : "did not sleep", r == STEP_DONE ? "slept" : "not ported");
+        return -1;
+    }
+    long d = first_difference();
+    if (d >= 0 || memcmp(board.cmos, model.cmos, sizeof model.cmos)) {
+        if (failures++ < 8)
+            fprintf(stderr, "test_routines: %s case %d at $%04X: $%04lX = %02X, C %02X%s\n", what, i, at, d,
+                    d >= 0 ? board.ram[d] : 0, d >= 0 ? model.ram[d] : 0, d < 0 ? " (the CMOS)" : "");
+        return -1;
+    }
+    return 0;
+}
+
+/* The task list's first pass ($E163) for n frames on both, a step each
+   when a task's sleep runs out; the controls from `controls` each frame */
+static long run_list(const char *what, int i, int frames, void (*controls)(int frame), uint16_t stop)
+{
+    long steps = 0;
+    for (int f = 0; f < frames; f++) {
+        if (stop && (uint16_t)(board.ram[TASK_U + 5] << 8 | board.ram[TASK_U + 6]) > stop) break;
+        controls(f);
+        uint16_t prev = 0xA00A;
+        for (uint16_t t = (uint16_t)(board.ram[0xA00A] << 8 | board.ram[0xA00B]); t;) {
+            if (!board.ram[t + 3] && !--board.ram[t + 4]) {
+                if ((uint16_t)(board.ram[t + 5] << 8 | board.ram[t + 6]) == 0x486C) hiscore_limited++;
+                if (one_step(what, i, t, prev)) return -1;
+                steps++;
+                uint16_t next = (uint16_t)(board.ram[prev] << 8 | board.ram[prev + 1]);
+                if (next != t) { /* it ended */
+                    t = next;
+                    continue;
+                }
+            }
+            prev = t;
+            t = (uint16_t)(board.ram[t] << 8 | board.ram[t + 1]);
+        }
+        if (!(board.ram[0xA00A] | board.ram[0xA00B])) break;
+    }
+    return steps;
+}
+
+static int flap_mostly;
+
+static void entry_controls(int frame)
+{
+    (void)frame;
+    static const uint8_t moves[] = { 0, INP_LEFT, INP_RIGHT, INP_FLAP, INP_RIGHT | INP_FLAP };
+    if (rnd() % 4 == 0) {
+        board.inp1 = flap_mostly && rnd() % 8 ? (uint8_t)(rnd() % 2 ? INP_FLAP : 0) : moves[rnd() % 5];
+        board.inp2 = flap_mostly && rnd() % 8 ? (uint8_t)(rnd() % 2 ? INP_FLAP : 0) : moves[rnd() % 5];
+    }
+}
+
+/* the high score entry ($464F, sim/hiscores.c): the game over task's last
+   step on a game in progress with random scores, one or two players, then
+   it and the entry tasks frame by frame with random controls */
+static void hiscore_cases(void)
+{
+    long steps = 0, entries = 0, limited = 0;
+    for (int i = 0; i < 300; i++) {
+        memcpy(board.ram, base, sizeof base);
+        for (int k = 7; k < 0x38; k++) board.ram[TASK_U + k] = 0;
+        poke_word(0xA00A, TASK_U); /* the list: this task alone */
+        poke_word(TASK_U, 0);
+        board.ram[TASK_U + 2] = 0x34;
+        board.ram[TASK_U + 3] = 0;
+        board.ram[TASK_U + 4] = 1;
+        poke_word(TASK_U + 5, 0x623C);
+        board.ram[TASK_U + 0xD] = 1;
+        board.cmos[0x05] = 0xF1; /* high scores on */
+        board.ram[0xA060] = (uint8_t)(rnd() % 2);
+        for (int p = 0; p < 2; p++)
+            for (int k = 0; k < 4; k++) board.ram[0xA04C + 10 * p + k] = (uint8_t)(k == 0 ? (rnd() % 3 ? 0 : bcd()) : bcd());
+        board.inp1 = board.inp2 = 0;
+        hiscore_limited = 0;
+        flap_mostly = rnd() % 2;
+        if (flap_mostly) /* blank initials in some of the table: the limit of 5 */
+            for (int k = 0, n = 3 + (int)(rnd() % 4); k < n; k++) {
+                uint16_t e = (uint16_t)(0xCD74 + 0x0E * (rnd() % 39));
+                for (int c = 0; c < 6; c += 2) {
+                    board.cmos[e - 0xCC00 + c] = 0xF0;
+                    board.cmos[e - 0xCC00 + c + 1] = 0xFA;
+                }
+            }
+        long n = run_list("high score", i, 3000, entry_controls, 0x623C);
+        if (n > 0) steps += n;
+        entries += board.ram[0xA0F5] != 0;
+        limited += hiscore_limited;
+    }
+    printf("test_routines: the high score entry: 300 cases, %ld steps, %ld with entries, %ld over the limit of 5\n",
+           steps, entries, limited);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -810,6 +930,7 @@ int main(int argc, char **argv)
     points_cases();
     waves_cases();
     burn_cases();
+    hiscore_cases();
     if (failures) {
         fprintf(stderr, "test_routines: %d differences\n", failures);
         return 1;

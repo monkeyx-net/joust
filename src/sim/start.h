@@ -35,6 +35,7 @@
 #include "sim/game.h"
 
 #define START_DEMO 0x5EEB
+#define START_ATTRACT 0x624D /* (through $5ED3) after a game and its high scores */
 
 int start_ported(uint16_t at);
 StepResult start_step(Game *g, uint16_t task, uint16_t at);

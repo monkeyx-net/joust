@@ -309,10 +309,20 @@ static StepResult run(Game *g, uint16_t u, uint16_t at)
             poke(g, F(u, 0xD), (uint8_t)(peek(g, F(u, 0xD)) - 1));
             if (peek(g, F(u, 0xD))) { at = 0x6234; break; }
             for (x = 0xA0EA; x < 0xA0F2; x++) poke(g, x, 0);
-            return STEP_UNPORTED; /* $3B61: the high score entry (the system ROM) */
+            return hiscores_game_over(g, u);
 
         /* ---- the attract mode's start ---------------------------------------- */
         case 0x5ED0: at = 0x627F; break;
+        case START_ATTRACT:
+            poke(g, 0xA0B3, 0);
+            if (peek(g, 0xA0F5)) {
+                game_sound(g, 0xEF21);
+                at = 0x626B;
+                break;
+            }
+            poke(g, F(u, 0xD), 0x6D);
+            game_over_message(g);
+            return task_sleep(g, 8, 0x6267);
         case 0x6267:
             poke(g, F(u, 0xD), (uint8_t)(peek(g, F(u, 0xD)) - 1));
             if (peek(g, F(u, 0xD))) {
