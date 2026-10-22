@@ -4,10 +4,13 @@ Joust (native SDL2 build)
 Converted by monkeyx.
 
 Run ./joust, or joust.exe on Windows (add --windowed for a window on a
-desktop). The game is your ROM's own code on an emulated Williams board,
-with sound; the port adds the graphics presets, pad controls and saving.
-On the first start the arcade restores its factory settings (a moment's
-work, done before the window opens). Your settings and high scores (the
+desktop). The game is the arcade's program rewritten in C; the port adds
+the graphics presets, pad controls and saving. On the first start it
+extracts what it needs from your ROM set (the program, the factory
+settings and the sounds) into an assets folder next to the program
+($JOUST_ASSETS if set); after that the ROM set is no longer needed.
+--emulate runs your ROM on an emulated Williams board instead (it needs
+the ROM set every time). Your settings and high scores (the
 arcade's CMOS) are saved as joust.cmos in $JOUST_SAVE_DIR, else
 $XDG_DATA_HOME/joust, %APPDATA%\joust on Windows, or ~/.local/share/joust.
 ./joust --test-card shows the ROM status, an input tester and the images
@@ -17,7 +20,7 @@ page lists the controls (and comes back every 40 seconds); any button
 hides it.
 
 ROM set
-  The game needs your own MAME joust ROM set. Put joust.zip (or a joust/
+  The first start needs your own MAME joust ROM set. Put joust.zip (or a joust/
   folder) next to the program, set JOUST_ROM to its path, or start with
   --rom /path/to/joust.zip. FBNeo sets and old file names work too: ROMs
   are matched by checksum. Check a set with: ./joust --check-rom joust.zip

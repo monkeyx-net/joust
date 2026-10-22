@@ -278,14 +278,18 @@ static int c_assets_open(const char *argv0)
     if (!assets_find(argv0, EXTRACT_MANIFEST, g.assets_dir, sizeof g.assets_dir)) return 0;
     if (!g.rom.loaded) return -1;
     char dir[1024], err[512];
-    snprintf(dir, sizeof dir, "%s", argv0);
-    char *slash = strrchr(dir, '/');
+    if (getenv("JOUST_ASSETS")) {
+        snprintf(dir, sizeof dir, "%s", getenv("JOUST_ASSETS"));
+    } else {
+        snprintf(dir, sizeof dir, "%s", argv0);
+        char *slash = strrchr(dir, '/');
 #ifdef _WIN32
-    char *bslash = strrchr(dir, '\\');
-    if (bslash > slash) slash = bslash;
+        char *bslash = strrchr(dir, '\\');
+        if (bslash > slash) slash = bslash;
 #endif
-    if (slash) snprintf(slash, sizeof dir - (size_t)(slash - dir), "/assets");
-    else snprintf(dir, sizeof dir, "assets");
+        if (slash) snprintf(slash, sizeof dir - (size_t)(slash - dir), "/assets");
+        else snprintf(dir, sizeof dir, "assets");
+    }
     printf("joust: extracting the assets to %s (once)\n", dir);
     if (extract_all(&g.rom, dir, err, sizeof err)) {
         fprintf(stderr, "joust: %s\n", err);

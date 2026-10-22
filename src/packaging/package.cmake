@@ -59,7 +59,7 @@ else()
        DESTINATION "${root}")
   # screenshot: the test card, rendered headless and without a ROM (no local paths)
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env SDL_VIDEODRIVER=dummy
-                  "${GAME}" --rom "" --frames 60 --screenshot "${root}/screenshot.png"
+                  "${GAME}" --rom "" --test-card --frames 60 --screenshot "${root}/screenshot.png"
                   RESULT_VARIABLE shot_rc OUTPUT_QUIET ERROR_QUIET)
   if(NOT shot_rc EQUAL 0)
     message(WARNING "could not render the PortMaster screenshot")
