@@ -28,13 +28,18 @@ uint32_t williams_rgb(uint8_t entry)
 void williams_draw_vram(Framebuffer *fb, const uint8_t *vram, const uint8_t palette[16])
 {
     uint32_t rgb[16];
-    for (int i = 0; i < 16; i++) rgb[i] = williams_rgb(palette[i]);
-    for (int y = 0; y < FB_HEIGHT; y++)
+    for (int i = 0; i < 16; i++) rgb[i] = 0xFF000000u | williams_rgb(palette[i]);
+    for (int y = 0; y < FB_HEIGHT; y++) {
+        int vy = y + WILLIAMS_VISIBLE_Y;
+        uint32_t *row = fb->scale == 1 ? fb_row(fb, y) : NULL; /* at scale 1 a row at a time */
         for (int x = 0; x < FB_WIDTH; x++) {
-            int vx = x + WILLIAMS_VISIBLE_X, vy = y + WILLIAMS_VISIBLE_Y;
+            int vx = x + WILLIAMS_VISIBLE_X;
             uint8_t b = vram[(vx >> 1) * 256 + vy];
-            fill_rectf(fb, x, y, 1, 1, rgb[vx & 1 ? b & 0x0F : b >> 4]);
+            uint32_t c = rgb[vx & 1 ? b & 0x0F : b >> 4];
+            if (row) row[x] = c;
+            else fill_rectf(fb, x, y, 1, 1, c);
         }
+    }
 }
 
 static uint8_t rom_at(const WilliamsBus *bus, unsigned addr)
